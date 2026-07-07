@@ -1,0 +1,3386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VR Atlas — Plataforma de compreensão do VR Super</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- ==========================================================================
+     VR ATLAS — arquivo HTML único, autossuficiente e reutilizável
+     --------------------------------------------------------------------------
+     Estrutura do arquivo:
+       1. TOKENS ...... variáveis de marca (cores VR, espaçamentos, raios)
+       2. BASE ........ reset, tipografia, scrollbar
+       3. LAYOUT ...... shell do app, topo, área de conteúdo
+       4. COMPONENTES . botões, cards, chips, badges, breadcrumb, busca
+       5. TELAS ....... Home / Mapa / Módulo / Funcionalidade / Impacto
+       6. RESPONSIVO .. breakpoints (<1024px e <640px)
+       7. HTML ........ marcação das 5 telas
+       8. SCRIPT ...... dados + navegação + lentes (JavaScript vanilla)
+     Cor principal: laranja VR (#E45500 / #FF6A00) — usada em ação,
+     navegação e pontos de conexão.
+     ========================================================================== -->
+
+<style>
+/* ============================================================
+   1. TOKENS DE MARCA
+   ============================================================ */
+:root{
+  /* Laranja VR — ação, navegação, conexões */
+  --orange:#E45500; --orange-bright:#FF6A00; --orange-600:#D44600; --orange-700:#BA3400;
+  --orange-soft:#FFF1E6; --orange-tint:#FFF7F1; --orange-border:#FFDCC1; --orange-sel:#FFD9BE;
+  /* Tinta / texto */
+  --ink:#242424; --ink-2:#33373B; --text-2:#5A5F64; --muted:#8A8F94; --muted-2:#9A9EA2; --faint:#C0BCB4;
+  /* Superfícies e linhas */
+  --page:#FBFAF8; --white:#fff; --subtle:#F4F2EF;
+  --line:#ECE8E2; --line-2:#EDEBE8; --line-3:#EAE7E2;
+  /* Cores de apoio (lentes / estados) */
+  --blue:#186EDE; --blue-ink:#0B4CA1; --blue-soft:#EEF4FE; --blue-border:#CFE0FA;
+  --green:#149438; --green-ink:#0A6F26; --green-soft:#E9F6EC; --green-border:#C7E6CE;
+  --red:#C8321F; --red-ink:#A3200F; --red-soft:#FDEEEB; --red-border:#F6CFC6;
+  --dev:#4C517F; --dev-ink:#35373B; --dev-soft:#F0F0F4; --dev-border:#DEDEE6;
+  /* Forma e profundidade */
+  --r-sm:8px; --r-md:11px; --r-lg:14px; --r-xl:16px;
+  --shadow-card:0 1px 2px rgba(0,0,0,.03);
+  --shadow-pop:0 12px 28px -14px rgba(228,85,0,.4);
+  --shadow-float:0 14px 34px -20px rgba(0,0,0,.22);
+  --header-h:60px;
+}
+
+/* ============================================================
+   2. BASE
+   ============================================================ */
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  color:var(--ink);
+  background:var(--page);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--orange-600);text-decoration:none;cursor:pointer}
+a:hover{color:var(--orange-700)}
+button{font-family:inherit}
+::selection{background:var(--orange-sel)}
+
+/* Scrollbar da área de conteúdo */
+#main{scrollbar-width:thin}
+#main::-webkit-scrollbar{width:10px;height:10px}
+#main::-webkit-scrollbar-thumb{background:#E2DED8;border-radius:8px;border:3px solid var(--page)}
+
+/* Animações */
+@keyframes flowDash{to{stroke-dashoffset:-24}}
+@keyframes atlasFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ============================================================
+   3. LAYOUT — shell, topo, conteúdo
+   ============================================================ */
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--page)}
+
+.topbar{
+  flex:none;display:flex;align-items:center;gap:20px;
+  height:var(--header-h);padding:0 24px;
+  background:rgba(255,255,255,.86);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line-2);z-index:20;
+}
+.brand{display:flex;align-items:center;gap:10px;background:none;border:none;cursor:pointer;padding:0}
+.brand__mark{display:flex;align-items:center;justify-content:center;width:40px;height:30px;border-radius:0;
+  background:transparent;color:inherit;flex:none}
+.brand__mark svg{display:block;width:40px;height:24px}
+.brand__name{font-weight:700;font-size:16px;letter-spacing:-.3px;color:var(--ink)}
+.brand__name b{color:var(--orange);font-weight:700}
+.topbar__divider{width:1px;height:22px;background:var(--line-2)}
+.topbar__spacer{flex:1}
+.tagline{font-size:12.5px;color:var(--muted);font-weight:500}
+
+/* Busca (decorativa — demonstra a intenção de busca contextual) */
+.search{display:flex;align-items:center;gap:9px;height:36px;padding:0 14px;
+  border:1px solid var(--line-3);border-radius:9px;background:#fff;color:var(--muted);font-size:13px;min-width:230px}
+
+/* Área rolável das telas */
+.body-shell{flex:1;min-height:0;display:flex;overflow:hidden}
+#main{flex:1;overflow-y:auto;overflow-x:hidden}
+.side-nav{width:222px;flex:none;background:#fff;border-right:1px solid var(--line-2);padding:18px 12px;overflow-y:auto}
+.side-nav.is-hidden{display:none}
+.side-nav__label{font-size:10.5px;font-weight:800;letter-spacing:.5px;color:var(--muted-2);padding:0 10px 10px;text-transform:uppercase}
+.side-nav__list{display:flex;flex-direction:column;gap:4px}
+.side-nav__item{width:100%;display:flex;align-items:center;gap:10px;height:38px;padding:0 10px;border:1px solid transparent;border-radius:9px;background:transparent;color:#4F555A;font-size:13px;font-weight:600;text-align:left;cursor:pointer;transition:.14s}
+.side-nav__item:hover{background:var(--orange-tint);color:var(--orange-700)}
+.side-nav__item.is-active{background:var(--orange-soft);border-color:var(--orange-border);color:var(--orange-700)}
+.side-nav__dot{width:7px;height:7px;border-radius:50%;background:#D9D5CE;flex:none}
+.side-nav__item.is-active .side-nav__dot{background:var(--orange-bright)}
+.side-nav__divider{height:1px;background:var(--line-2);margin:10px 8px}
+.screen{display:none}
+.screen.is-active{display:block;animation:atlasFade .34s cubic-bezier(.2,.7,.3,1)}
+.wrap{max-width:1120px;margin:0 auto;padding:36px 40px 72px}
+.wrap--wide{max-width:1240px}
+.wrap--feature{max-width:1180px}
+
+/* ============================================================
+   4. COMPONENTES
+   ============================================================ */
+/* Breadcrumb — sempre mostra "onde estou" */
+.crumbs{display:flex;align-items:center;gap:6px;font-size:13px;min-width:0;overflow:hidden}
+.crumbs a,.crumbs span.current{white-space:nowrap}
+.crumbs .sep{color:#C9CCCF}
+.crumbs a{color:var(--muted);font-weight:500}
+.crumbs a:hover{color:var(--orange-700)}
+.crumbs .current{color:var(--ink);font-weight:600}
+
+/* Botões */
+.btn{display:inline-flex;align-items:center;gap:9px;border-radius:var(--r-md);
+  font-size:15px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:.16s}
+.btn--primary{height:48px;padding:0 24px;border:none;color:#fff;
+  background:linear-gradient(135deg,var(--orange-bright),var(--orange));
+  box-shadow:0 8px 20px -6px rgba(228,85,0,.5)}
+.btn--secondary{height:48px;padding:0 20px;background:#fff;border-color:#E2DED8;color:#3B3F44}
+.btn--secondary:hover{background:#F7F5F2}
+.btn--ghost-orange{height:40px;padding:0 16px;font-size:13.5px;background:#fff;border-color:#FFD0AE;color:var(--orange-700)}
+.btn--ghost-orange:hover{background:var(--orange-tint)}
+.btn--back{width:100%;height:44px;justify-content:center;font-size:14px;background:#fff;border-color:#E2DED8;color:#3B3F44}
+.btn--back:hover{background:#F7F5F2}
+
+/* Cards e superfícies */
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-card)}
+.card--link{cursor:pointer;transition:.16s}
+.card--link:hover{border-color:#FFC79E;box-shadow:var(--shadow-pop);transform:translateY(-2px)}
+
+/* Chips / tags */
+.chip{font-size:12.5px;color:#3B3F44;background:var(--subtle);border:1px solid var(--line-3);padding:5px 11px;border-radius:var(--r-sm)}
+.chip--orange{color:var(--orange-700);background:#fff;border-color:var(--orange-border);font-weight:500}
+.chip--blue{font-size:12px;color:var(--blue);background:var(--blue-soft);border-color:var(--blue-border);padding:4px 10px;border-radius:7px}
+
+/* Badge de tipo de tela (Cadastro / Fluxo / Consulta) */
+.tag-tipo{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.4px;
+  color:var(--orange-700);background:var(--orange-soft);border:1px solid var(--orange-border);
+  padding:2px 9px;border-radius:6px}
+
+/* Bloco "Por que existe" — contexto antes da funcionalidade */
+.why{padding:22px 24px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--orange-bright);
+  border-radius:0 var(--r-lg) var(--r-lg) 0;max-width:820px}
+.why__label{font-size:11.5px;font-weight:700;letter-spacing:.5px;color:var(--orange);margin-bottom:8px}
+.why p{font-size:16.5px;line-height:1.55;color:var(--ink-2);margin:0}
+
+/* Rótulos de seção pequenos */
+.eyebrow{font-size:11px;font-weight:700;color:var(--muted-2);letter-spacing:.4px}
+.section-title{font-size:14px;font-weight:700;margin:0}
+.section-sub{font-size:12.5px;color:var(--muted-2);margin:2px 0 0}
+
+/* Setas de fluxo (SVG inline reutilizadas via classe utilitária) */
+.arrow-h{flex:none}
+
+/* ============================================================
+   5A. TELA — HOME
+   ============================================================ */
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;
+  background:var(--orange-soft);border:1px solid var(--orange-border);color:var(--orange-700);
+  font-size:12px;font-weight:600;letter-spacing:.3px;margin-bottom:22px}
+.hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--orange-bright)}
+.hero h1{font-size:46px;line-height:1.1;font-weight:800;letter-spacing:-1.4px;margin:0 0 20px;max-width:820px;text-wrap:balance}
+.hero h1 .accent{color:var(--orange)}
+.hero__sub{position:relative;font-size:17px;line-height:1.55;color:var(--text-2);max-width:640px;margin:0 0 18px;padding-left:22px}
+.hero__sub::before{content:"";position:absolute;left:0;top:12px;width:10px;height:2px;min-width:10px;border-radius:999px;background:var(--orange-bright)}
+.hero__sub--support{font-size:17px;max-width:720px;color:#666B70;margin-bottom:12px}
+.hero__sub--support:last-of-type{margin-bottom:32px}
+.hero__sub b{color:var(--ink);font-weight:600}
+.hero__cta{display:flex;gap:12px;align-items:center;margin-bottom:64px;flex-wrap:wrap}
+
+.row-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;gap:12px}
+.row-head h2{font-size:15px;font-weight:700;margin:0;color:var(--ink)}
+.row-head .hint{font-size:12.5px;color:var(--muted-2)}
+
+/* Fita do fluxo macro (Home) */
+.ribbon{display:flex;align-items:stretch;overflow-x:auto;padding:8px 2px 18px;margin:0 -4px;scrollbar-width:thin;scrollbar-color:#D8D4CD transparent}
+.ribbon::-webkit-scrollbar{height:8px}
+.ribbon::-webkit-scrollbar-track{background:#F2EFEA;border-radius:999px}
+.ribbon::-webkit-scrollbar-thumb{background:#D8D4CD;border-radius:999px}
+.ribbon::-webkit-scrollbar-thumb:hover{background:#C8C2BA}
+.ribbon__item{display:flex;align-items:center;flex:none}
+.station-chip{width:132px;height:118px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;
+  gap:8px;padding:14px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);
+  cursor:pointer;text-align:left;transition:.16s;box-shadow:var(--shadow-card)}
+.station-chip:hover{border-color:#FFC79E;box-shadow:0 10px 24px -12px rgba(228,85,0,.35);transform:translateY(-2px)}
+.station-chip__icon{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:var(--orange-soft);color:var(--orange)}
+.station-chip__num{display:block;font-size:10.5px;font-weight:700;color:var(--faint);letter-spacing:.5px}
+.station-chip__label{display:block;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.2;margin-top:2px}
+
+/* Entradas por intenção */
+.intents{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:14px}
+.intent{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:20px;background:#fff;
+  border:1px solid var(--line);border-radius:15px;cursor:pointer;text-align:left;transition:.16s}
+.intent:hover{border-color:#FFC79E;box-shadow:var(--shadow-pop);transform:translateY(-2px)}
+.intent__icon{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:var(--r-md)}
+.intent__label{font-size:14.5px;font-weight:600;color:var(--ink);line-height:1.3}
+.intent__sub{font-size:12.5px;color:var(--muted);line-height:1.45}
+
+
+/* Seleção de lente / view na tela de fluxo */
+.view-select{margin:0 0 46px;display:grid;grid-template-columns:1fr 1.6fr;gap:22px;align-items:start}
+.view-select__intro{padding:0;background:transparent;border:0;border-radius:0}
+.view-select__intro h2{font-size:18px;font-weight:800;letter-spacing:-.3px;margin:3px 0 8px}
+.view-select__intro p{font-size:13.5px;color:var(--text-2);line-height:1.5;margin:0;max-width:430px}
+.lens-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.lens-choice{padding:16px 16px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);text-align:left;cursor:pointer;transition:.16s;min-height:120px}
+.lens-choice:hover{border-color:#FFC79E;box-shadow:0 10px 24px -16px rgba(228,85,0,.35);transform:translateY(-1px)}
+.lens-choice.is-active{box-shadow:0 10px 24px -18px rgba(0,0,0,.28)}
+.lens-choice__top{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.lens-choice__dot{width:8px;height:8px;border-radius:50%;flex:none}
+.lens-choice__title{font-size:14px;font-weight:700;color:var(--ink)}
+.lens-choice__desc{font-size:12px;line-height:1.45;color:var(--muted);margin:0}
+
+/* ============================================================
+   5B. TELA — MAPA MACRO (metáfora de linha de metrô)
+   ============================================================ */
+.map-head h1{font-size:30px;font-weight:800;letter-spacing:-.8px;margin:0 0 8px}
+.map-head p{font-size:15px;color:var(--text-2);max-width:640px;margin:0 0 8px}
+.map-head .accent{color:var(--orange);font-weight:600}
+.map-head .hint{font-size:13px;color:var(--muted-2);margin:0 0 26px}
+
+.metro{overflow-x:auto;padding:20px 0 8px}
+.metro__track{position:relative;min-width:1120px;height:360px}
+.metro__line{position:absolute;top:178px;left:0;overflow:visible}
+.metro__stations{position:absolute;inset:0;display:flex}
+.metro__station{position:relative;flex:1;height:100%}
+.metro__dot{position:absolute;left:50%;top:180px;transform:translate(-50%,-50%);
+  width:26px;height:26px;border-radius:50%;background:#fff;border:4px solid var(--orange-bright);cursor:pointer;z-index:3;padding:0;transition:.15s}
+.metro__dot:hover{background:var(--orange-bright)}
+.metro__card{position:absolute;left:50%;transform:translateX(-50%);width:150px;padding:13px;background:#fff;
+  border:1px solid var(--line);border-radius:13px;cursor:pointer;text-align:left;z-index:2;
+  box-shadow:0 4px 14px -8px rgba(0,0,0,.18);transition:.16s}
+.metro__card:hover{border-color:#FFC79E;box-shadow:0 14px 30px -14px rgba(228,85,0,.45);transform:translateX(-50%) translateY(-2px)}
+.metro__card--up{bottom:calc(50% + 30px)}
+.metro__card--down{top:calc(50% + 30px)}
+.metro__stem{position:absolute;left:50%;transform:translateX(-50%);width:2px;background:var(--orange-border);z-index:1;height:30px}
+.metro__stem--up{bottom:calc(50% + 13px)}
+.metro__stem--down{top:calc(50% + 13px)}
+.metro__cardhead{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.metro__cardicon{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:var(--orange-soft);color:var(--orange)}
+.metro__cardnum{font-size:10px;font-weight:700;color:var(--faint);letter-spacing:.5px}
+.metro__cardlabel{display:block;font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.2}
+.metro__cardtag{display:block;font-size:11px;color:var(--muted);line-height:1.35;margin-top:4px}
+
+.legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:26px;padding:16px 20px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg)}
+.legend__item{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2)}
+.legend__line{width:14px;height:3px;background:var(--orange-bright);border-radius:2px}
+.legend__dot{width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--orange-bright)}
+
+/* ============================================================
+   5C. TELA — MÓDULO (ex.: Financeiro)
+   ============================================================ */
+/* Mini-fluxo: mostra a localização do módulo atual no fluxo macro */
+.miniflow{display:flex;align-items:center;gap:4px;overflow-x:auto;padding:6px 0 22px}
+.miniflow__item{display:flex;align-items:center;gap:4px;flex:none}
+.miniflow__btn{display:flex;align-items:center;height:30px;padding:0 11px;border-radius:var(--r-sm);
+  border:1px solid var(--line-3);background:#fff;color:var(--text-2);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap}
+.miniflow__btn.is-current{background:var(--orange-bright);color:#fff;border-color:var(--orange-bright);font-weight:700}
+.miniflow__sep{color:#D8D4CD;font-size:12px}
+
+.module-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.module-head__icon{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:var(--r-lg);
+  background:linear-gradient(135deg,var(--orange-soft),#FFE3CC);color:var(--orange)}
+.module-head h1{font-size:30px;font-weight:800;letter-spacing:-.7px;margin:0}
+.module-head .tag-tipo{margin-bottom:5px}
+
+.module-grid{display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start;margin-top:28px}
+
+/* Lista de fluxos/telas do módulo */
+.tela{display:flex;align-items:center;gap:14px;padding:15px 16px;background:#fff;border:1px solid var(--line);
+  border-radius:13px;text-align:left;transition:.16s;width:100%;cursor:default}
+.tela.is-openable{cursor:pointer;border-color:var(--orange-border)}
+.tela.is-openable:hover{border-color:#FFC79E;box-shadow:var(--shadow-pop);transform:translateY(-2px)}
+.tela__icon{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;flex:none}
+.tela__name{display:block;font-size:14.5px;font-weight:600;color:var(--ink)}
+.tela__tipo{display:block;font-size:12px;color:var(--muted-2);margin-top:1px}
+.tela__badge{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+
+/* Painéis de conexão (alimentado por / impacta / conectado com) */
+.conn{padding:16px 18px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg)}
+.conn--warm{background:linear-gradient(135deg,var(--orange-tint),#FFEFE3);border-color:var(--orange-border)}
+.conn__head{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:12px}
+.conn--warm .conn__head{color:var(--orange-700)}
+.conn__chips{display:flex;flex-wrap:wrap;gap:7px}
+
+/* ============================================================
+   5D. TELA — FUNCIONALIDADE (Conta a Pagar) + LENTES
+   ============================================================ */
+.feature-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}
+.feature-head__icon{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:var(--r-lg);
+  background:linear-gradient(135deg,var(--orange-soft),#FFE3CC);color:var(--orange);flex:none}
+.feature-head__body{flex:1}
+.feature-head__meta{display:flex;align-items:center;gap:9px;margin-bottom:6px;flex-wrap:wrap}
+.feature-head__path{font-size:12.5px;color:var(--muted-2)}
+.feature-head h1{font-size:31px;font-weight:800;letter-spacing:-.7px;margin:0 0 6px}
+.feature-head__sub{font-size:15px;color:var(--text-2);margin:0;max-width:640px}
+
+/* Barra de LENTES (grudada no topo ao rolar) */
+.lensbar{position:sticky;top:0;z-index:10;background:linear-gradient(var(--page) 70%,rgba(251,250,248,0));padding:10px 0 12px;margin:20px 0 6px}
+.lensbar__inner{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lensbar__label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted-2);letter-spacing:.3px}
+.lens-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.lens-tab{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:9px;
+  border:1px solid var(--line-3);background:#fff;color:var(--text-2);font-size:13px;font-weight:500;cursor:pointer;transition:.15s}
+.lens-tab .dot{width:7px;height:7px;border-radius:50%}
+.lens-tab.is-active{font-weight:700}
+
+.feature-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:22px;align-items:start}
+.anatomy{display:flex;flex-direction:column;gap:20px}
+.panel{padding:20px 22px;background:#fff;border:1px solid var(--line);border-radius:var(--r-xl)}
+.panel--warm{background:linear-gradient(135deg,#FFFDFB,#FFF6EF);border-color:var(--orange-border)}
+
+/* Ciclo de vida do título */
+.lifecycle{display:flex;align-items:stretch;overflow-x:auto;padding-bottom:4px}
+.lifecycle__item{display:flex;align-items:center;flex:none}
+.life-step{width:110px;padding:11px 10px;border-radius:var(--r-md);background:var(--page);border:1px solid var(--line-3);text-align:center}
+.life-step.is-hot{background:var(--orange-bright);border-color:var(--orange-bright)}
+.life-step__num{display:block;font-size:10px;font-weight:700;color:var(--faint);letter-spacing:.4px}
+.life-step.is-hot .life-step__num{color:rgba(255,255,255,.8)}
+.life-step__label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);line-height:1.25;margin-top:4px}
+.life-step.is-hot .life-step__label{color:#fff}
+
+/* Grade quem/quando/antes/depois */
+.qq-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mini-card{padding:16px 18px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg)}
+.mini-card__label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted-2);letter-spacing:.4px;margin-bottom:9px}
+.mini-card p{font-size:12.5px;color:#3B3F44;line-height:1.5;margin:0}
+.list-dot{display:flex;flex-direction:column;gap:6px}
+.list-dot span{font-size:12.5px;color:#3B3F44;display:flex;gap:7px}
+.list-dot .bullet{color:var(--faint)}
+
+/* Campos */
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.field-item{margin-bottom:0}
+.field-item .n{display:block;font-size:13px;font-weight:600;color:var(--ink)}
+.field-item .d{display:block;font-size:11.5px;color:var(--muted-2);line-height:1.4}
+
+/* Mapa de campo (destaque) */
+.fieldmap{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 16px}
+.fieldmap__k{display:block;font-size:10.5px;font-weight:600;color:#B0AAA0;letter-spacing:.3px}
+.fieldmap__v{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin-top:2px}
+.formula{margin-top:14px;padding:11px 14px;background:#fff;border:1px dashed #FFCFA8;border-radius:10px;
+  font-size:13px;font-weight:600;color:var(--orange-700)}
+
+/* Regras */
+.rule{display:flex;gap:10px;align-items:flex-start}
+.rule span{font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.rules{display:flex;flex-direction:column;gap:10px}
+
+/* Consulta / links */
+.foot-cards{display:flex;flex-wrap:wrap;gap:16px}
+.foot-card{flex:1;min-width:220px;padding:16px 18px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg)}
+.link-list{display:flex;flex-direction:column;gap:7px}
+.link-list a{font-size:12.5px;display:flex;align-items:center;gap:6px}
+
+/* Painel da LENTE (lateral, grudado) */
+.lenspanel-col{position:sticky;top:calc(var(--header-h) + 4px)}
+.lenspanel{border-radius:var(--r-xl);overflow:hidden;border:1px solid var(--line);background:#fff;box-shadow:var(--shadow-float)}
+.lenspanel__head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.lenspanel__icon{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9px;background:#fff}
+.lenspanel__eyebrow{display:block;font-size:10.5px;font-weight:700;letter-spacing:.4px}
+.lenspanel__title{display:block;font-size:15px;font-weight:700;color:var(--ink);line-height:1.1}
+.lenspanel__body{padding:18px 20px 22px}
+.lenspanel__intro{font-size:13px;color:var(--text-2);line-height:1.5;margin:0 0 16px}
+.lens-block{margin-bottom:16px}
+.lens-block__h{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;letter-spacing:.3px;margin-bottom:9px}
+.lens-block__h .dot{width:5px;height:5px;border-radius:50%}
+.lens-block__items{display:flex;flex-direction:column;gap:7px}
+.lens-item{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border-radius:9px}
+.lens-item .mark{font-size:11px;margin-top:2px;flex:none}
+.lens-item .txt{font-size:12.5px;color:var(--ink-2);line-height:1.45}
+
+/* ============================================================
+   5E. TELA — MAPA DE IMPACTO
+   ============================================================ */
+.impact-head h1{font-size:29px;font-weight:800;letter-spacing:-.7px;margin:0 0 8px}
+.impact-head p{font-size:15px;color:var(--text-2);max-width:640px;margin:0 0 30px}
+.impact-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:26px;align-items:start}
+.impact-canvas{padding:32px 26px;background:#fff;border:1px solid var(--line);border-radius:18px;overflow-x:auto}
+.impact-up{display:flex;flex-direction:column;gap:8px;margin-bottom:26px}
+.impact-arrow-v{display:flex;justify-content:center;margin-bottom:8px}
+.impact-node-central{display:flex;justify-content:center;margin-bottom:8px}
+.impact-central{display:flex;align-items:center;gap:11px;padding:16px 22px;border-radius:var(--r-lg);color:#fff;
+  background:linear-gradient(135deg,var(--orange-bright),var(--orange));box-shadow:0 12px 26px -10px rgba(228,85,0,.6);font-size:16px;font-weight:700}
+.impact-chain{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;row-gap:14px;margin-top:22px}
+.impact-chain__item{display:flex;align-items:center;flex:none}
+.impact-box{min-width:118px;padding:13px 15px;background:var(--page);border:1px solid var(--line-3);border-radius:12px;text-align:center}
+.impact-box .l{display:block;font-size:13.5px;font-weight:600;color:var(--ink-2)}
+.impact-box .t{display:block;font-size:10.5px;color:var(--muted-2);margin-top:2px}
+.impact-branch{margin-top:20px;display:flex;justify-content:center}
+.impact-branch__pill{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--blue-soft);border:1px dashed #B9D3F7;border-radius:10px;font-size:12.5px;color:var(--blue-ink)}
+.impact-side{display:flex;flex-direction:column;gap:12px}
+.impact-what{padding:18px 20px;background:linear-gradient(135deg,var(--orange-tint),#FFEFE3);border:1px solid var(--orange-border);border-radius:15px}
+.impact-what__label{font-size:11.5px;font-weight:700;color:var(--orange-700);letter-spacing:.4px;margin-bottom:12px}
+.impact-what__list{display:flex;flex-direction:column;gap:11px}
+.impact-what__list .row{display:flex;gap:10px;align-items:flex-start}
+.impact-what__list .txt{font-size:13px;color:var(--ink-2);line-height:1.45}
+
+
+/* ============================================================
+   5F. MICROINTERAÇÕES JS — feedback visual sem poluir a tela
+   ============================================================ */
+.fx-reveal{opacity:0;transform:translateY(10px);transition:opacity .34s ease, transform .34s ease}
+.fx-reveal.is-visible{opacity:1;transform:none}
+.fx-ripple{position:relative;overflow:hidden}
+.ripple-dot{position:absolute;border-radius:50%;background:rgba(255,106,0,.18);transform:scale(0);animation:ripple .55s ease-out;pointer-events:none}
+@keyframes ripple{to{transform:scale(8);opacity:0}}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);padding:10px 14px;background:#242424;color:#fff;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 12px 30px -16px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:.22s;z-index:80}
+.toast.is-on{opacity:1;transform:translate(-50%,0)}
+.side-nav__item{position:relative}
+.side-nav__item.is-active:before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--orange-bright)}
+.station-chip.is-preview,.tela.is-preview{border-color:#FFC79E;box-shadow:0 14px 28px -18px rgba(228,85,0,.5)}
+
+
+/* Blocos de origem da documentação */
+.doc-source{margin-top:12px;font-size:11.5px;color:var(--muted-2);display:flex;gap:6px;align-items:center}
+.feature-head__source{font-size:12px;color:var(--muted-2);margin-top:6px}
+.tela__doc{display:block;font-size:11.5px;color:var(--muted-2);margin-top:3px;line-height:1.35}
+
+/* ============================================================
+   6. RESPONSIVO
+   ============================================================ */
+@media (max-width:1024px){
+  .module-grid,.feature-grid,.impact-grid,.view-select{grid-template-columns:1fr}
+  .lenspanel-col{position:static}
+  .lensbar{position:static}
+  .hero h1{font-size:38px}
+}
+@media (max-width:640px){
+  .wrap,.wrap--wide,.wrap--feature{padding:24px 18px 56px}
+  .topbar{gap:12px;padding:0 14px}
+  .search,.tagline{display:none}
+  .hero h1{font-size:29px;letter-spacing:-1px}
+  .hero__sub{font-size:15px}
+  .qq-grid,.fields{grid-template-columns:1fr}
+  .fieldmap{grid-template-columns:1fr 1fr}
+  .feature-head{flex-wrap:wrap}
+  .feature-head .btn--ghost-orange{margin-top:6px}
+  .map-head h1,.module-head h1,.feature-head h1,.impact-head h1{font-size:24px}
+}
+</style>
+</head>
+
+<body>
+<!-- ============================================================
+     7. HTML — shell + 5 telas
+     ============================================================ -->
+<div class="app">
+
+  <!-- ------------------------------------------------ TOPO ------------------------------------------------ -->
+  <header class="topbar">
+    <button class="brand" onclick="Atlas.go('home')">
+      <span class="brand__mark"><svg viewBox="0 0 80 47" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M40.8141 46.0953L75.1518 34.0304C78.3747 32.7308 78.926 31.4195 78.3678 28.012L72.5177 8.83598C72.3347 7.7369 71.748 6.74612 70.873 6.05823C69.998 5.37034 68.898 5.03506 67.7889 5.11828L17.6932 8.21324C15.9715 8.31194 15.1903 9.31774 15.8541 10.9134L28.6707 40.655C31.2861 46.5582 34.5559 48.2667 40.8141 46.0953Z" fill="url(#vr-logo-paint0)"/>
+  <path d="M13.8793 6.38898L11.6955 1.21898C11.5062 0.893283 11.2466 0.614093 10.9357 0.401849C10.6249 0.189604 10.2706 0.0496667 9.89879 -0.00772304H1.87904C1.57215 -0.0345786 1.26366 0.0213509 0.985611 0.154212C0.707559 0.287074 0.470081 0.492047 0.297768 0.74788C0.125455 1.00371 0.0245542 1.30107 0.00563721 1.60912C-0.0132798 1.91717 0.0504681 2.22466 0.190179 2.49973L2.388 7.62038C2.52674 8.02642 2.7958 8.37504 3.15308 8.61182C3.51036 8.84861 3.93578 8.96027 4.36305 8.92935L12.7346 8.42411C14.0834 8.33011 14.3672 7.53108 13.8793 6.38898Z" fill="url(#vr-logo-paint1)"/>
+  <path d="M75.7875 33.7578C78.4427 32.5381 78.8861 31.1727 78.3678 28.012L72.5177 8.83598C72.3346 7.7369 71.748 6.74612 70.873 6.05823C69.998 5.37034 68.898 5.03506 67.7889 5.11828L47.3818 6.38024C57.9602 14.275 67.5039 23.4732 75.7875 33.7578Z" fill="url(#vr-logo-paint2)"/>
+  <defs>
+    <linearGradient id="vr-logo-paint0" x1="15.6189" y1="23.5" x2="78.5585" y2="23.5" gradientUnits="userSpaceOnUse"><stop stop-color="#F8F094"/><stop offset="1" stop-color="#E95A0C"/></linearGradient>
+    <linearGradient id="vr-logo-paint1" x1="0.00238037" y1="4.5" x2="14.1021" y2="4.5" gradientUnits="userSpaceOnUse"><stop stop-color="#E95A0C"/><stop offset="1" stop-color="#F8F094"/></linearGradient>
+    <linearGradient id="vr-logo-paint2" x1="47.3818" y1="19.5" x2="78.5577" y2="19.5" gradientUnits="userSpaceOnUse"><stop stop-color="#F8F094"/><stop offset="1" stop-color="#E95A0C"/></linearGradient>
+  </defs>
+</svg></span>
+      <span class="brand__name">VR <b>Atlas</b></span>
+    </button>
+    <div class="topbar__divider"></div>
+    <!-- Breadcrumb dinâmico (preenchido pelo script) -->
+    <nav class="crumbs" id="crumbs"></nav>
+    <span class="tagline" id="tagline">Entenda o VR Super como um sistema único.</span>
+    <div class="topbar__spacer"></div>
+    <!-- Busca contextual (demonstrativa) -->
+    <div class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B0B4B8" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span>Buscar fluxo, tela, campo, regra…</span>
+    </div>
+  </header>
+
+  <div class="body-shell">
+    <aside class="side-nav is-hidden" id="sideNav"><!-- preenchido pelo script --></aside>
+
+  <main id="main">
+
+    <!-- ==================== TELA: HOME ==================== -->
+    <section class="screen is-active" data-screen="home" data-screen-label="Home">
+      <div class="wrap">
+        <div class="hero">
+          <h1>Entenda o VR Super como um <span class="accent">sistema único</span>,<br>e não apenas como um conjunto de módulos.</h1>
+          <p class="hero__sub">O Atlas te mostra <b>onde você está</b>, de onde o dado veio e para onde ele vai, pelo fluxo real de um supermercado, de ponta a ponta.</p>
+          <p class="hero__sub hero__sub--support">Se você está fazendo onboarding, mudou de módulo, recebeu uma nova User Story ou só precisa tirar dúvidas sobre um processo, esta plataforma foi feita para te dar contexto antes de te jogar em uma tela.</p>
+          <div class="hero__cta">
+            <button class="btn btn--primary" onclick="Atlas.go('map')">
+              Começar a explorar
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TELA: MAPA / FLUXO MACRO ==================== -->
+    <section class="screen" data-screen="map" data-screen-label="Início">
+      <div class="wrap wrap--wide">
+        <section class="view-select">
+          <div class="view-select__intro">
+            <span class="eyebrow" style="color:var(--orange)">LENTE / VIEW</span>
+            <h2>Como você quer enxergar o Atlas?</h2>
+            <p>Escolha uma lente para adaptar os próximos conteúdos. A mesma funcionalidade pode ser vista com foco em contexto, QA, PO, suporte ou desenvolvimento.</p>
+          </div>
+          <div class="lens-choices" id="view-selector"><!-- preenchido pelo script --></div>
+        </section>
+
+        <div class="row-head" style="margin-bottom:18px">
+          <div>
+            <h2 style="font-size:18px">O caminho de uma operação de supermercado</h2>
+            <p class="section-sub" style="margin-top:6px">Clique em qualquer etapa para entender onde ela se encaixa no VR Super.</p>
+          </div>
+          <span class="hint">Clique em qualquer etapa · role para o lado →</span>
+        </div>
+        <div class="ribbon" id="ribbon"><!-- preenchido pelo script --></div>
+      </div>
+    </section>
+
+    <!-- ==================== TELA: MÓDULO ==================== -->
+    <section class="screen" data-screen="module" data-screen-label="Módulo">
+      <div class="wrap">
+        <div class="module-head">
+          <span class="module-head__icon" id="module-icon"></span>
+          <div>
+            <span class="tag-tipo" id="module-tipo"></span>
+            <h1 id="module-name"></h1>
+          </div>
+        </div>
+
+        <!-- Contexto antes da funcionalidade -->
+        <div class="why">
+          <div class="why__label">POR QUE EXISTE</div>
+          <p id="module-why"></p>
+        </div>
+
+        <div class="module-grid">
+          <div>
+            <h2 class="section-title">Fluxos e telas que vivem aqui</h2>
+            <p class="section-sub" style="margin-bottom:14px">O que você realmente abre no dia a dia deste módulo.</p>
+            <div id="module-telas" style="display:flex;flex-direction:column;gap:10px"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="conn">
+              <div class="conn__head"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22B54C" stroke-width="2" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>ALIMENTADO POR</div>
+              <div class="conn__chips" id="module-alimenta"></div>
+            </div>
+            <div class="conn">
+              <div class="conn__head"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DB6D72" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>IMPACTA</div>
+              <div class="conn__chips" id="module-impacta"></div>
+            </div>
+            <div class="conn conn--warm">
+              <div class="conn__head"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#E45500" stroke-width="2" stroke-linecap="round"><path d="M6 3v12M18 9v12M6 15a6 6 0 0 0 6 6h6"/></svg>CONECTADO COM</div>
+              <div class="conn__chips" id="module-conexoes"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TELA: FUNCIONALIDADE (Conta a Pagar) ==================== -->
+    <section class="screen" data-screen="feature" data-screen-label="Funcionalidade Conta a Pagar">
+      <div class="wrap wrap--feature">
+        <div class="feature-head">
+          <span class="feature-head__icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+          </span>
+          <div class="feature-head__body">
+            <div class="feature-head__meta">
+              <span class="tag-tipo" id="feature-tipo">FLUXO OPERACIONAL</span>
+            </div>
+            <h1 id="feature-title">Conta a Pagar</h1>
+            <p class="feature-head__sub" id="feature-subtitle">O título que representa um valor que o supermercado precisa pagar, de um fornecedor, uma despesa ou uma nota fiscal.</p>
+          </div>
+          <button class="btn btn--ghost-orange" onclick="Atlas.go('impact')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><path d="M9 6h6a3 3 0 0 1 3 3M9 18h6a3 3 0 0 0 3-3"/></svg>
+            Mapa de impacto
+          </button>
+        </div>
+
+        <!-- Contexto -->
+        <div class="why">
+          <div class="why__label">POR QUE EXISTE</div>
+          <p style="font-size:16px" id="feature-why">Sem o Conta a Pagar, o supermercado não sabe <b>quanto deve, para quem e quando</b>. Ele organiza os compromissos financeiros para que nada seja pago a mais, a menos ou fora do prazo, e para que tudo chegue certo na tesouraria e na contabilidade.</p>
+        </div>
+
+        <!-- Barra de LENTES -->
+        <div class="lensbar">
+          <div class="lensbar__inner">
+            <span class="lensbar__label"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>LENTES</span>
+            <div class="lens-tabs" id="lens-tabs"><!-- preenchido pelo script --></div>
+          </div>
+        </div>
+
+        <div class="feature-grid">
+          <!-- Anatomia (independe da lente) -->
+          <div class="anatomy">
+            <!-- Ciclo de vida -->
+            <section class="panel">
+              <h2 class="section-title" id="feature-cycle-title">Ciclo de vida</h2>
+              <p class="section-sub" id="feature-cycle-sub" style="margin-bottom:18px">De onde nasce e para onde vai.</p>
+              <div class="lifecycle" id="lifecycle"></div>
+            </section>
+
+            <!-- Quem / Quando / Antes / Depois -->
+            <div class="qq-grid">
+              <div class="mini-card">
+                <div class="mini-card__label">QUEM USA</div>
+                <div class="conn__chips" id="quem-usa"></div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card__label">QUANDO USA</div>
+                <p id="quando-usa">Sempre que surge uma obrigação de pagamento.</p>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card__label"><span style="color:#22B54C">←</span>O QUE VEM ANTES</div>
+                <div class="list-dot" id="antes"></div>
+              </div>
+              <div class="mini-card">
+                <div class="mini-card__label">O QUE ACONTECE DEPOIS<span style="color:#DB6D72">→</span></div>
+                <div class="list-dot" id="depois"></div>
+              </div>
+            </div>
+
+            <!-- Campos -->
+            <section class="panel">
+              <h2 class="section-title" style="margin-bottom:16px">Campos que importam</h2>
+              <div class="fields">
+                <div>
+                  <div class="eyebrow" style="color:var(--orange);margin-bottom:10px">PRINCIPAIS</div>
+                  <div style="display:flex;flex-direction:column;gap:8px" id="campos-princ"></div>
+                </div>
+                <div>
+                  <div class="eyebrow" style="color:#B2822D;margin-bottom:10px">CONDICIONAIS</div>
+                  <div style="display:flex;flex-direction:column;gap:8px" id="campos-cond"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Mapa de campo (destaque) -->
+            <section class="panel panel--warm">
+              <div class="eyebrow" style="color:var(--orange);margin-bottom:4px">MAPA DE CAMPO</div>
+              <h3 id="fieldmap-title" style="font-size:16px;font-weight:700;margin:0 0 14px">Valor Líquido</h3>
+              <div class="fieldmap" id="fieldmap"></div>
+              <div class="formula" id="fieldmap-formula">Valor Líquido = Valor Bruto − Desconto + Acréscimo</div>
+            </section>
+
+            <!-- Regras -->
+            <section class="panel">
+              <h2 class="section-title" style="margin-bottom:14px">Regras de negócio</h2>
+              <div class="rules" id="regras"></div>
+            </section>
+
+            <!-- Consulta / Links -->
+            <div class="foot-cards">
+              <div class="foot-card">
+                <div class="eyebrow" style="margin-bottom:10px">ONDE CONSULTO DEPOIS</div>
+                <div class="conn__chips" id="consulta"></div>
+              </div>
+              <div class="foot-card">
+                <div class="eyebrow" style="margin-bottom:10px">LINKS RELACIONADOS</div>
+                <div class="link-list" id="links"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Painel da LENTE (muda conforme a lente escolhida) -->
+          <div class="lenspanel-col">
+            <div class="lenspanel" id="lenspanel"><!-- preenchido pelo script --></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TELA: MAPA DE IMPACTO ==================== -->
+    <section class="screen" data-screen="impact" data-screen-label="Mapa de impacto">
+      <div class="wrap">
+        <div class="impact-head">
+          <h1 id="impact-title">Mapa de impacto</h1>
+          <p id="impact-subtitle">Veja o que se move junto. Cada seta é uma dependência real entre módulos.</p>
+        </div>
+        <div class="impact-grid">
+          <div class="impact-canvas">
+            <!-- Origem -->
+            <div class="impact-up">
+              <span class="eyebrow">ORIGEM (upstream)</span>
+              <div class="conn__chips">
+                <span class="chip">Fornecedor / NF</span>
+                <span class="chip">Despesa</span>
+                <span class="chip">Lançamento manual</span>
+              </div>
+            </div>
+            <div class="impact-arrow-v"><svg width="16" height="26" viewBox="0 0 16 26" fill="none"><path d="M8 2v18M3 15l5 5 5-5" stroke="#FF6A00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <!-- Nó central -->
+            <div class="impact-node-central">
+              <div class="impact-central">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/></svg>
+                <span id="impact-central-label">Conta a Pagar</span>
+              </div>
+            </div>
+            <div class="impact-arrow-v" style="margin-bottom:22px"><svg width="16" height="26" viewBox="0 0 16 26" fill="none"><path d="M8 2v18M3 15l5 5 5-5" stroke="#FF6A00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <!-- Cadeia de impacto -->
+            <div class="impact-chain" id="impact-chain"></div>
+            <!-- Ramo fiscal -->
+            <div class="impact-branch">
+              <div class="impact-branch__pill">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#186EDE" stroke-width="2" stroke-linecap="round"><path d="M7 7h10M7 12h10M7 17h6"/></svg>
+                <span><b>Ramo fiscal:</b> classificação e apuração acompanham o título</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="impact-side">
+            <div class="impact-what">
+              <div class="impact-what__label">SE VOCÊ MEXE AQUI…</div>
+              <div class="impact-what__list" id="impact-list"></div>
+            </div>
+            <button class="btn btn--back" onclick="Atlas.go('feature')">← Voltar para Conta a Pagar</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+  </div>
+  <div class="toast" id="toast" aria-live="polite"></div>
+</div>
+
+<!-- ============================================================
+     8. SCRIPT — dados + navegação + lentes (JavaScript vanilla)
+     ============================================================ -->
+<script>
+(function(){
+"use strict";
+
+/* -------- Ícones (SVG stroke, herdam currentColor) -------- */
+var ICON = {
+  fornecedor:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h13v10H1zM14 8h4l3 3v2h-7z"/><circle cx="6" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
+  compra:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.2 12.4a1.6 1.6 0 0 0 1.6 1.3h8.4a1.6 1.6 0 0 0 1.6-1.3L22 7H6"/></svg>',
+  recebimento:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h16v5H4zM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="m9 13 2 2 4-4"/></svg>',
+  estoque:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7Z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>',
+  venda:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h13l3 5v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M4 7h16M9 11h6M9 15h6"/></svg>',
+  financeiro:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M2 10h20"/><circle cx="17" cy="14" r="1.5"/></svg>',
+  fiscal:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M9 13l6 4M15 13l-6 4"/></svg>',
+  contabilidade:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h8M8 14h4"/></svg>',
+  gestao:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>'
+};
+var ARROW_H = '<svg class="arrow-h" width="26" height="20" viewBox="0 0 26 20" fill="none"><path d="M2 10h20M17 5l6 5-6 5" stroke="#FF6A00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/* -------- Dados: as 9 etapas do fluxo do supermercado -------- */
+var STAGES = {
+  "fornecedor": {
+    "label": "Fornecedor",
+    "tipo": "Cadastro & Origem",
+    "tag": "Quem participa das operações",
+    "porque": "No VR Super, pessoas cadastradas podem assumir papéis como fornecedor, cliente, contador, prestador de serviço, operadora de cartão e outros. Esse cadastro sustenta notas fiscais, vendas no PDV, compras, financeiro e demais transações do sistema.",
+    "telas": [
+      {
+        "name": "Consulta de Pessoa",
+        "tipo": "Consulta",
+        "key": "consultaPessoa",
+        "doc": "Pesquisa pessoas por código, nome, CPF/CNPJ/RUC, tipo, situação e CRM."
+      },
+      {
+        "name": "Cadastro de Pessoa",
+        "tipo": "Estrutura",
+        "key": "cadastroPessoa",
+        "doc": "Inclui e organiza pessoas físicas ou jurídicas, tipos de pessoa, endereços, contatos, LGPD e dados financeiros."
+      },
+      {
+        "name": "Tipos de Pessoa",
+        "tipo": "Estrutura",
+        "doc": "Especializações como Cliente, Fornecedor, Transportador, Contador, Operadora de Cartão e Instituição de Pagamento."
+      }
+    ],
+    "alimenta": [
+      "Pessoa física/jurídica",
+      "Tipos de Pessoa",
+      "Endereços e contatos",
+      "Dados fiscais"
+    ],
+    "impacta": [
+      "Compra e NF-e",
+      "PDV e vendas",
+      "Financeiro",
+      "CRM e LGPD"
+    ],
+    "conexoes": [
+      "Compra",
+      "Venda / PDV",
+      "Financeiro",
+      "Fiscal"
+    ]
+  },
+  "compra": {
+    "label": "Compra",
+    "tipo": "Fluxo Operacional",
+    "tag": "O que entra",
+    "porque": "A compra define o que o supermercado vai repor, de quem está comprando e quais dados irão alimentar recebimento, estoque, financeiro e fiscal. Quando a compra vira nota ou recebimento, ela tende a gerar movimentações de estoque e títulos financeiros.",
+    "telas": [
+      {
+        "name": "Pedido de Compra",
+        "tipo": "Fluxo",
+        "doc": "Origem operacional da reposição."
+      },
+      {
+        "name": "Fornecedor / Pessoa",
+        "tipo": "Estrutura",
+        "key": "cadastroPessoa",
+        "doc": "Fornecedor é uma especialização do cadastro de pessoa."
+      },
+      {
+        "name": "Tipo de Movimentação",
+        "tipo": "Estrutura",
+        "doc": "Parametriza movimentações que podem gerar estoque e financeiro."
+      }
+    ],
+    "alimenta": [
+      "Fornecedor",
+      "Produto",
+      "Condição de pagamento"
+    ],
+    "impacta": [
+      "Recebimento",
+      "Estoque",
+      "Conta a Pagar",
+      "Custo do produto"
+    ],
+    "conexoes": [
+      "Fornecedor",
+      "Recebimento",
+      "Estoque",
+      "Financeiro"
+    ]
+  },
+  "recebimento": {
+    "label": "Recebimento",
+    "tipo": "Fluxo Operacional",
+    "tag": "Confere o que chegou",
+    "porque": "O recebimento conecta a mercadoria física com a nota fiscal. Quando é feito corretamente, o sistema consegue refletir estoque, custo, financeiro e fiscal com menos divergências.",
+    "telas": [
+      {
+        "name": "Entrada de Mercadoria",
+        "tipo": "Fluxo",
+        "doc": "Entrada da mercadoria e da nota no sistema."
+      },
+      {
+        "name": "Fornecedor / NF",
+        "tipo": "Estrutura",
+        "key": "cadastroPessoa",
+        "doc": "Pessoa e dados fiscais sustentam o recebimento."
+      },
+      {
+        "name": "Movimentação de Estoque",
+        "tipo": "Fluxo",
+        "key": "movimentacaoEstoque",
+        "doc": "Ajustes e movimentações impactam saldo e extrato."
+      }
+    ],
+    "alimenta": [
+      "Compra",
+      "Fornecedor / NF",
+      "Produto"
+    ],
+    "impacta": [
+      "Saldo de estoque",
+      "Custo",
+      "Conta a Pagar",
+      "Fiscal"
+    ],
+    "conexoes": [
+      "Compra",
+      "Estoque",
+      "Financeiro",
+      "Fiscal"
+    ]
+  },
+  "estoque": {
+    "label": "Estoque",
+    "tipo": "Cadastro & Fluxo",
+    "tag": "O que existe",
+    "porque": "O estoque depende do produto bem cadastrado e das movimentações corretas. Ele controla disponibilidade, entradas, saídas, ajustes, locais de estoque e reflexos no custo e na venda.",
+    "telas": [
+      {
+        "name": "Consulta de Produto",
+        "tipo": "Consulta",
+        "key": "consultaProduto",
+        "doc": "Busca produtos por código, descrição, código de barras, tipo, marca, embalagem e situação."
+      },
+      {
+        "name": "Cadastro de Produto",
+        "tipo": "Estrutura",
+        "key": "cadastroProduto",
+        "doc": "Configura dados que sustentam venda, compra, logística e estoque."
+      },
+      {
+        "name": "Movimentação de Estoque",
+        "tipo": "Fluxo",
+        "key": "movimentacaoEstoque",
+        "doc": "Registra entrada/saída, local, quantidade, motivo e observação."
+      }
+    ],
+    "alimenta": [
+      "Recebimento",
+      "Cadastro de Produto",
+      "Tipo de Movimentação"
+    ],
+    "impacta": [
+      "Venda / PDV",
+      "Custo e margem",
+      "Reposição",
+      "Relatórios"
+    ],
+    "conexoes": [
+      "Recebimento",
+      "Venda / PDV",
+      "Compra",
+      "Gestão"
+    ]
+  },
+  "venda": {
+    "label": "Venda / PDV",
+    "tipo": "Fluxo Operacional",
+    "tag": "A saída",
+    "porque": "A venda no PDV é o ponto em que produto, cliente, forma de pagamento, estoque, financeiro e fiscal se encontram. Ela reduz estoque, gera recebíveis, alimenta relatórios e pode impactar crédito rotativo e tesouraria.",
+    "telas": [
+      {
+        "name": "PDV / Frente de Caixa",
+        "tipo": "Fluxo",
+        "doc": "Origem da venda e dos recebíveis."
+      },
+      {
+        "name": "Consulta de Produto",
+        "tipo": "Consulta",
+        "key": "consultaProduto",
+        "doc": "Produto precisa estar ativo e configurado para venda."
+      },
+      {
+        "name": "Conta a Receber",
+        "tipo": "Fluxo Operacional",
+        "key": "contaReceber",
+        "doc": "Vendas do PDV e emissão de NF podem gerar títulos a receber."
+      }
+    ],
+    "alimenta": [
+      "Produto",
+      "Cliente",
+      "Forma de pagamento"
+    ],
+    "impacta": [
+      "Estoque",
+      "Conta a Receber",
+      "Tesouraria",
+      "Fiscal e relatórios"
+    ],
+    "conexoes": [
+      "Estoque",
+      "Financeiro",
+      "Fiscal",
+      "Gestão"
+    ]
+  },
+  "financeiro": {
+    "label": "Financeiro",
+    "tipo": "Fluxo Operacional",
+    "tag": "A pagar e a receber",
+    "porque": "O Financeiro organiza títulos, baixas, contas correntes e visão de caixa. Ele recebe informações de compras, vendas, notas fiscais e PDV, e devolve dados para tesouraria, contabilidade e gestão.",
+    "telas": [
+      {
+        "name": "Conta a Pagar",
+        "tipo": "Fluxo Operacional",
+        "key": "contaPagar",
+        "doc": "Consulta e lançamento de títulos gerados por nota fiscal, devolução de cliente ou lançamento manual."
+      },
+      {
+        "name": "Conta a Receber",
+        "tipo": "Fluxo Operacional",
+        "key": "contaReceber",
+        "doc": "Consulta e lançamento de títulos a receber gerados por PDV, nota fiscal ou lançamento manual."
+      },
+      {
+        "name": "Baixa de Título",
+        "tipo": "Fluxo Operacional",
+        "key": "baixaTitulo",
+        "doc": "Liquida títulos e altera saldo, status e reflexos financeiros."
+      },
+      {
+        "name": "Tesouraria / Visão de Caixa",
+        "tipo": "Fluxo Operacional",
+        "key": "tesouraria",
+        "doc": "Monitora PDVs, divergências, moedas, operadores, abastecimentos e retiradas."
+      },
+      {
+        "name": "Banco e Conta Corrente",
+        "tipo": "Estrutura",
+        "key": "bancoConta",
+        "doc": "Cadastra contas usadas em pagamentos, recebimentos, baixa de títulos e tesouraria."
+      }
+    ],
+    "alimenta": [
+      "Compra",
+      "Venda / PDV",
+      "Nota Fiscal",
+      "Banco e conta corrente"
+    ],
+    "impacta": [
+      "Fluxo de caixa",
+      "Tesouraria",
+      "Contabilidade",
+      "Relatórios financeiros"
+    ],
+    "conexoes": [
+      "Compra",
+      "Venda / PDV",
+      "Fiscal",
+      "Contabilidade"
+    ]
+  },
+  "fiscal": {
+    "label": "Fiscal",
+    "tipo": "Fluxo & Apuração",
+    "tag": "Os impostos",
+    "porque": "O Fiscal depende de produto, pessoa, regime tributário, tipo de contribuinte, notas e movimentações. Dados incorretos podem afetar emissão de documentos fiscais, apuração e arquivos fiscais.",
+    "telas": [
+      {
+        "name": "Pessoa Jurídica / CNPJ",
+        "tipo": "Estrutura",
+        "key": "cadastroPessoa",
+        "doc": "Regime tributário, tipo contribuinte e IE impactam impostos e arquivos fiscais."
+      },
+      {
+        "name": "Cadastro de Produto",
+        "tipo": "Estrutura",
+        "key": "cadastroProduto",
+        "doc": "Produto possui dados como NCM, classificação e cenário fiscal."
+      },
+      {
+        "name": "Apuração / Relatórios Fiscais",
+        "tipo": "Consulta",
+        "doc": "Consolida os efeitos fiscais das operações."
+      }
+    ],
+    "alimenta": [
+      "Pessoa",
+      "Produto",
+      "Recebimento",
+      "Venda / PDV"
+    ],
+    "impacta": [
+      "NF-e",
+      "Arquivos fiscais",
+      "Contabilidade",
+      "Obrigações"
+    ],
+    "conexoes": [
+      "Recebimento",
+      "Venda / PDV",
+      "Financeiro",
+      "Contabilidade"
+    ]
+  },
+  "contabilidade": {
+    "label": "Contabilidade",
+    "tipo": "Estrutura & Apuração",
+    "tag": "A tradução contábil",
+    "porque": "A contabilidade transforma compras, vendas, pagamentos, recebimentos e impostos em lançamentos classificados. O Plano de Contas organiza a estrutura usada para classificar corretamente os registros financeiros e contábeis.",
+    "telas": [
+      {
+        "name": "Plano de Contas",
+        "tipo": "Estrutura",
+        "key": "planoContas",
+        "doc": "Estrutura contas contábeis para classificar lançamentos financeiros e contábeis."
+      },
+      {
+        "name": "Lançamentos Contábeis",
+        "tipo": "Fluxo",
+        "doc": "Recebe reflexos de financeiro, fiscal e operações."
+      },
+      {
+        "name": "Balancete / Demonstrativos",
+        "tipo": "Consulta",
+        "doc": "Consulta resultados organizados pela estrutura contábil."
+      }
+    ],
+    "alimenta": [
+      "Financeiro",
+      "Fiscal",
+      "Plano de Contas"
+    ],
+    "impacta": [
+      "Demonstrativos",
+      "Auditoria",
+      "Relatórios contábeis"
+    ],
+    "conexoes": [
+      "Financeiro",
+      "Fiscal",
+      "Gestão"
+    ]
+  },
+  "gestao": {
+    "label": "Gestão / Relatórios",
+    "tipo": "Consulta & Decisão",
+    "tag": "A leitura do todo",
+    "porque": "A gestão consolida informações de produtos, estoque, venda, financeiro, fiscal e contabilidade para apoiar decisões. Consultas e relatórios ajudam a entender resultado, divergências, saldos e desempenho operacional.",
+    "telas": [
+      {
+        "name": "Relatórios financeiros",
+        "tipo": "Consulta",
+        "doc": "Exportam e analisam resultados em relatório, Excel ou arquivo."
+      },
+      {
+        "name": "Visão de Caixa",
+        "tipo": "Consulta",
+        "key": "tesouraria",
+        "doc": "Mostra caixa, operadores, PDVs, divergências e totais."
+      },
+      {
+        "name": "Consulta de Produto / Estoque",
+        "tipo": "Consulta",
+        "key": "consultaProduto",
+        "doc": "Apoia análise de produto, status e disponibilidade."
+      }
+    ],
+    "alimenta": [
+      "Estoque",
+      "Venda / PDV",
+      "Financeiro",
+      "Contabilidade"
+    ],
+    "impacta": [
+      "Decisão de compra",
+      "Preço e margem",
+      "Correção de divergências",
+      "Acompanhamento da operação"
+    ],
+    "conexoes": [
+      "Estoque",
+      "Venda / PDV",
+      "Financeiro",
+      "Contabilidade"
+    ]
+  }
+};
+var ORDER = ['fornecedor','compra','recebimento','estoque','venda','financeiro','fiscal','contabilidade','gestao'];
+
+/* Estilo por tipo de tela */
+var TIPO_STYLE = {
+  'Estrutura':{bg:'var(--blue-soft)',ink:'var(--blue)'},
+  'Fluxo':{bg:'var(--orange-soft)',ink:'var(--orange-700)'},
+  'Consulta':{bg:'var(--green-soft)',ink:'var(--green)'},
+  'Fluxo Operacional':{bg:'var(--orange-soft)',ink:'var(--orange-700)'}
+};
+
+/* -------- Dados: as Lentes -------- */
+var LENSES = [
+  {id:'novo',label:'Novo Colaborador',dot:'var(--orange)',ink:'var(--orange-700)',bg:'var(--orange-tint)',border:'var(--orange-border)'},
+  {id:'qa',label:'QA',dot:'var(--red)',ink:'var(--red-ink)',bg:'var(--red-soft)',border:'var(--red-border)'},
+  {id:'po',label:'PO',dot:'var(--blue)',ink:'var(--blue-ink)',bg:'var(--blue-soft)',border:'var(--blue-border)'},
+  {id:'suporte',label:'Suporte',dot:'var(--green)',ink:'var(--green-ink)',bg:'var(--green-soft)',border:'var(--green-border)'},
+  {id:'dev',label:'DEV',dot:'var(--dev)',ink:'var(--dev-ink)',bg:'var(--dev-soft)',border:'var(--dev-border)'}
+];
+var LENS_ICON = {
+  novo:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>',
+  qa:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>',
+  po:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>',
+  suporte:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.5 8a6.5 6.5 0 0 0-13 0M3 13v-1a2 2 0 0 1 2-2h1v6H5a2 2 0 0 1-2-2Zm18 0v-1a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2ZM18 16v1a3 3 0 0 1-3 3h-3"/></svg>',
+  dev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13 6l-2 12"/></svg>'
+};
+var LENS_CONTENT = {
+  novo:{title:'Novo Colaborador',intro:'Comece por aqui se você ainda está entendendo como o supermercado funciona.',blocks:[
+    {h:'EM UMA FRASE',mark:'›',items:['É a “lista de contas a pagar” do supermercado: tudo que ele deve, organizado por vencimento.']},
+    {h:'ANALOGIA',mark:'›',items:['Pense nos boletos que chegam em casa. Cada boleto é um título; pagá-lo é dar baixa.']},
+    {h:'GLOSSÁRIO',mark:'•',items:['Título: o registro de uma dívida a pagar.','Baixa: o ato de marcar o título como pago.','Fonte Pagadora: quem de fato paga (pode ser diferente da pessoa da conta).']},
+    {h:'EXEMPLO PRÁTICO',mark:'›',items:['Chega a NF de um fornecedor de R$ 3.000 para 30 dias. O sistema gera um título no Conta a Pagar com vencimento na data — e você vê tudo que vence naquele dia.']}
+  ]},
+  qa:{title:'QA',intro:'Onde a coisa costuma quebrar e o que você precisa validar antes de aprovar.',blocks:[
+    {h:'RISCOS',mark:'!',items:['Valor Líquido não recalcula ao alterar desconto/acréscimo.','Desconto maior que o valor bruto gerando título negativo.','Título duplicado ao reprocessar a mesma NF.','Baixa parcial não atualizando o saldo em aberto.']},
+    {h:'CENÁRIOS DE TESTE',mark:'✓',items:['Gerar título por NF, por despesa e manual — todos chegam corretos?','Baixar total, parcial e estornar — o saldo e o status batem?','Fonte pagadora diferente da pessoa da conta.']},
+    {h:'CAMPOS CRÍTICOS',mark:'•',items:['Valor Bruto, Desconto, Acréscimo, Valor Líquido','Vencimento e Data de competência','Fonte Pagadora']},
+    {h:'REGRESSÃO SUGERIDA',mark:'↻',items:['Baixa de Título, Tesouraria e lançamento contábil após qualquer mudança no cálculo do valor.']},
+    {h:'PERGUNTAS PARA O PO',mark:'?',items:['Valor Líquido pode ser editado manualmente?','O que acontece com a baixa se o título for cancelado depois de pago?','Estorno reabre o título ou gera um novo?']}
+  ]},
+  po:{title:'PO',intro:'Regras, dependências e o que precisa estar decidido antes do refinamento.',blocks:[
+    {h:'REGRAS DE NEGÓCIO',mark:'•',items:['Valor Líquido = Bruto − Desconto + Acréscimo.','Título só pode ser baixado se estiver em aberto.','Fonte pagadora define de qual conta sai o dinheiro.']},
+    {h:'CRITÉRIOS DE ACEITE',mark:'✓',items:['Título gerado reflete exatamente o valor da origem.','Baixa reduz o saldo em aberto e alimenta a tesouraria.','Estorno mantém trilha de auditoria.']},
+    {h:'DEPENDÊNCIAS',mark:'→',items:['Plano de Contas, Cadastro de Pessoa e Forma de Pagamento precisam existir.']},
+    {h:'DECISÕES PENDENTES',mark:'?',items:['Permitir edição manual do valor líquido?','Regra de agrupamento de títulos por fornecedor.']}
+  ]},
+  suporte:{title:'Suporte',intro:'O que o cliente costuma perguntar e onde você resolve.',blocks:[
+    {h:'ERROS COMUNS',mark:'!',items:['“O título não aparece para baixa” — normalmente já foi baixado ou está cancelado.','“Valor divergente” — desconto/acréscimo lançado errado na origem.']},
+    {h:'DÚVIDAS FREQUENTES',mark:'?',items:['Como cancelar um título já pago?','Onde vejo o que foi pago hoje?']},
+    {h:'ONDE CONSULTAR',mark:'→',items:['Consulta de Conta a Pagar (filtro por status/vencimento).','Extrato de Tesouraria para conferir a baixa.']},
+    {h:'CAUSAS PROVÁVEIS',mark:'•',items:['Parametrização de forma de pagamento incorreta.','Fonte pagadora errada no lançamento.']}
+  ]},
+  dev:{title:'DEV',intro:'Comportamento esperado e integrações que dependem deste registro.',blocks:[
+    {h:'COMPORTAMENTO ESPERADO',mark:'•',items:['Geração do título é idempotente por origem (evitar duplicidade).','Valor Líquido é derivado — não persistido de forma editável, salvo regra específica.']},
+    {h:'DEPENDÊNCIAS FUNCIONAIS',mark:'→',items:['Origem (NF/Despesa/Manual) → geração do título.','Baixa → evento para Tesouraria e Contabilidade.']},
+    {h:'INTEGRAÇÕES',mark:'⇄',items:['Tesouraria (saldo/caixa), Contabilidade (lançamento), Fiscal (classificação).']},
+    {h:'IMPACTOS TÉCNICOS',mark:'!',items:['Alteração no cálculo do valor exige revisar relatórios e conciliação.']}
+  ]}
+};
+
+/* -------- Dados das funcionalidades estruturadas a partir da documentação -------- */
+var FEATURE_DATA = {
+  "consultaPessoa": {
+    "title": "Consulta de Pessoa",
+    "tipo": "CONSULTA",
+    "stageId": "fornecedor",
+    "subtitle": "Tela para visualizar, pesquisar e listar pessoas cadastradas, como destinatários de notas fiscais, fornecedores, clientes e outros perfis.",
+    "why": "Ajuda o usuário a localizar rapidamente pessoas cadastradas e entender quais registros podem participar de operações como notas fiscais, vendas no PDV e transações financeiras.",
+    "cycleTitle": "Fluxo de consulta",
+    "cycleSub": "Como o usuário encontra uma pessoa cadastrada.",
+    "lifecycle": [
+      {
+        "step": "BASE",
+        "label": "Pessoa cadastrada"
+      },
+      {
+        "step": "FILTROS",
+        "label": "Código, nome, CPF/CNPJ/RUC"
+      },
+      {
+        "step": "AQUI",
+        "label": "Consulta de Pessoa",
+        "hot": true
+      },
+      {
+        "step": "AÇÃO",
+        "label": "Editar, ativar ou inativar"
+      },
+      {
+        "step": "USO",
+        "label": "NF, PDV, financeiro"
+      }
+    ],
+    "quemUsa": [
+      "Cadastro",
+      "Fiscal",
+      "Financeiro",
+      "Comercial",
+      "Suporte"
+    ],
+    "quando": "Quando precisa localizar uma pessoa por identificação, tipo, situação, nome ou CRM antes de usar em outra operação.",
+    "antes": [
+      "Cadastro de Pessoa",
+      "Tipos de Pessoa definidos",
+      "CPF/CNPJ/RUC informado"
+    ],
+    "depois": [
+      "Edição do cadastro",
+      "Uso em NF-e ou PDV",
+      "Uso como cliente, fornecedor ou fonte pagadora"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Código",
+        "d": "Identificador único usado para localizar o registro."
+      },
+      {
+        "n": "Nome/Razão Social/Nome Fantasia",
+        "d": "Permite buscar pela denominação legal ou comercial."
+      },
+      {
+        "n": "CPF/CNPJ/RUC",
+        "d": "Identificação fiscal usada para validar entidades."
+      },
+      {
+        "n": "Tipo de Pessoa",
+        "d": "Categoria do registro, como cliente, fornecedor, contador ou operadora."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Tipo de Inscrição",
+        "d": "Pessoa Física ou Jurídica, define campos e regras."
+      },
+      {
+        "n": "Situação",
+        "d": "Ativo, inativo ou todos."
+      },
+      {
+        "n": "CRM Ativo",
+        "d": "Filtra pessoas com CRM habilitado ou desabilitado."
+      }
+    ],
+    "fieldTitle": "Tipo de Pessoa",
+    "fieldMap": [
+      {
+        "k": "USO",
+        "v": "Classificação"
+      },
+      {
+        "k": "OPÇÕES",
+        "v": "Cliente, Fornecedor..."
+      },
+      {
+        "k": "IMPACTA",
+        "v": "Operações permitidas"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Filtro não refletir tabela"
+      },
+      {
+        "k": "ONDE APARECE",
+        "v": "NF, PDV, Financeiro"
+      },
+      {
+        "k": "ORIGEM DOC",
+        "v": "Pessoa"
+      }
+    ],
+    "formula": "Tipo de pessoa define como o cadastro se comporta nas operações.",
+    "regras": [
+      "A tabela carrega automaticamente ao acessar a tela.",
+      "Por padrão, a consulta traz registros ativos.",
+      "Situação pode filtrar ativos, inativos ou todos.",
+      "A quantidade de registros depende da configuração de itens por página."
+    ],
+    "consulta": [
+      "Cadastro de Pessoa",
+      "Notas fiscais",
+      "PDV",
+      "Financeiro"
+    ],
+    "links": [
+      "Doc oficial: Pessoa",
+      "Doc oficial: Consulta de Pessoa"
+    ],
+    "impactChain": [
+      {
+        "label": "Cadastro de Pessoa",
+        "tag": "origem"
+      },
+      {
+        "label": "Tipos de Pessoa",
+        "tag": "classifica"
+      },
+      {
+        "label": "Operações",
+        "tag": "usa"
+      },
+      {
+        "label": "Financeiro/Fiscal",
+        "tag": "impacta"
+      }
+    ],
+    "impactList": [
+      "Filtros errados dificultam localizar cliente ou fornecedor.",
+      "Situação ativa/inativa muda disponibilidade em operações.",
+      "Tipo de pessoa incorreto pode impedir uso em módulos dependentes."
+    ]
+  },
+  "cadastroPessoa": {
+    "title": "Cadastro de Pessoa",
+    "tipo": "ESTRUTURA",
+    "stageId": "fornecedor",
+    "subtitle": "Tela para incluir e organizar pessoas físicas ou jurídicas que participarão das operações do sistema.",
+    "why": "Centraliza dados de pessoas usadas em notas fiscais, vendas no PDV, financeiro, CRM e operações do supermercado, com tipos e características específicas.",
+    "cycleTitle": "Ciclo do cadastro",
+    "cycleSub": "De cadastro base até uso operacional.",
+    "lifecycle": [
+      {
+        "step": "DADOS",
+        "label": "Código, ativo, país, data"
+      },
+      {
+        "step": "INSCRIÇÃO",
+        "label": "Física ou Jurídica"
+      },
+      {
+        "step": "AQUI",
+        "label": "Cadastro de Pessoa",
+        "hot": true
+      },
+      {
+        "step": "TIPOS",
+        "label": "Cliente, fornecedor etc."
+      },
+      {
+        "step": "ABAS",
+        "label": "LGPD, endereço, contato, financeiro"
+      },
+      {
+        "step": "USO",
+        "label": "NF, PDV e financeiro"
+      }
+    ],
+    "quemUsa": [
+      "Cadastro",
+      "Financeiro",
+      "Fiscal",
+      "Comercial",
+      "Suporte"
+    ],
+    "quando": "Quando uma pessoa precisa participar de operações do sistema, como cliente, fornecedor, contador, prestador de serviço ou operadora.",
+    "antes": [
+      "Dados de identificação da pessoa",
+      "Definição se é pessoa física ou jurídica",
+      "Necessidade de uso em algum processo"
+    ],
+    "depois": [
+      "Pessoa pode ser usada em notas e vendas",
+      "Pode virar fornecedor, cliente ou fonte pagadora",
+      "Pode alimentar CRM, LGPD, endereços e contatos"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Código",
+        "d": "Gerado automaticamente ao salvar e único por registro."
+      },
+      {
+        "n": "Ativo",
+        "d": "Define se a pessoa pode ser usada em novos lançamentos."
+      },
+      {
+        "n": "Data Cadastro",
+        "d": "Bloqueado e preenchido automaticamente ao salvar."
+      },
+      {
+        "n": "CPF/CNPJ",
+        "d": "Define se o cadastro é físico ou jurídico e aciona regras específicas."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Nome / CPF",
+        "d": "Pessoa física: nome obrigatório até 60 caracteres e CPF obrigatório até 11 caracteres."
+      },
+      {
+        "n": "CNPJ",
+        "d": "Pessoa jurídica: CNPJ com 14 caracteres pode buscar dados automaticamente."
+      },
+      {
+        "n": "Regime Tributário",
+        "d": "Impacta formação de impostos e arquivos fiscais."
+      },
+      {
+        "n": "Tipo Contribuinte",
+        "d": "Define comportamento da Inscrição Estadual."
+      }
+    ],
+    "fieldTitle": "CNPJ",
+    "fieldMap": [
+      {
+        "k": "TIPO",
+        "v": "Identificação fiscal"
+      },
+      {
+        "k": "TAMANHO",
+        "v": "14 caracteres"
+      },
+      {
+        "k": "AO INFORMAR",
+        "v": "Busca dados automática"
+      },
+      {
+        "k": "PREENCHE",
+        "v": "Razão, situação, fundação"
+      },
+      {
+        "k": "IMPACTA",
+        "v": "NF-e e Fiscal"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Auto-preenchimento"
+      }
+    ],
+    "formula": "CNPJ informado pode preencher razão social, situação cadastral, data de situação, data de fundação e nome fantasia.",
+    "regras": [
+      "Ao inativar uma pessoa, não é permitido efetuar novos lançamentos.",
+      "Pessoa Física exibe campos como Nome, CPF, Tipo Contribuinte, RG, nascimento e gênero.",
+      "Pessoa Jurídica exibe CNPJ, Razão Social, Nome Fantasia, Regime Tributário, Tipo Contribuinte, IE e IM.",
+      "Apenas um endereço e um contato podem ser do tipo Principal.",
+      "A aba LGPD não é editável, pois vem do Portal do Cliente."
+    ],
+    "consulta": [
+      "Consulta de Pessoa",
+      "Notas fiscais",
+      "PDV",
+      "Conta a Pagar/Receber",
+      "CRM/LGPD"
+    ],
+    "links": [
+      "Doc oficial: Cadastro de Pessoa",
+      "Doc oficial: Consulta de Pessoa"
+    ],
+    "impactChain": [
+      {
+        "label": "Pessoa",
+        "tag": "base"
+      },
+      {
+        "label": "Tipos de Pessoa",
+        "tag": "especializa"
+      },
+      {
+        "label": "NF/PDV",
+        "tag": "opera"
+      },
+      {
+        "label": "Financeiro/Fiscal",
+        "tag": "impacta"
+      }
+    ],
+    "impactList": [
+      "Cadastro inativo impede novos lançamentos.",
+      "Tipo de contribuinte altera regra de Inscrição Estadual.",
+      "Regime tributário pode impactar impostos e arquivos fiscais.",
+      "Dados LGPD e contatos alteram tratativas e comunicação."
+    ]
+  },
+  "consultaProduto": {
+    "title": "Consulta de Produto",
+    "tipo": "CONSULTA",
+    "stageId": "estoque",
+    "subtitle": "Tela para pesquisar produtos cadastrados usando filtros como código, descrição, categoria, situação e dados complementares.",
+    "why": "Ajuda a localizar produtos com agilidade antes de venda, compra, movimentação de estoque, análise ou correção cadastral.",
+    "cycleTitle": "Fluxo de consulta",
+    "cycleSub": "Como o usuário encontra e valida produtos.",
+    "lifecycle": [
+      {
+        "step": "BASE",
+        "label": "Produto cadastrado"
+      },
+      {
+        "step": "FILTROS",
+        "label": "Código, descrição, barras"
+      },
+      {
+        "step": "AQUI",
+        "label": "Consulta de Produto",
+        "hot": true
+      },
+      {
+        "step": "AÇÃO",
+        "label": "Editar ou status"
+      },
+      {
+        "step": "USO",
+        "label": "PDV, estoque, compra"
+      }
+    ],
+    "quemUsa": [
+      "Cadastro",
+      "Estoque",
+      "Compras",
+      "PDV",
+      "Suporte"
+    ],
+    "quando": "Quando precisa localizar produto ativo/inativo, conferir dados ou acessar edição antes de uma operação.",
+    "antes": [
+      "Cadastro de Produto",
+      "Marca, família, embalagem e classificação",
+      "Status do produto definido"
+    ],
+    "depois": [
+      "Edição do produto",
+      "Movimentação de estoque",
+      "Venda no PDV",
+      "Relatórios e exportações"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Código",
+        "d": "Identificador único do produto."
+      },
+      {
+        "n": "Descrição",
+        "d": "Busca por palavras-chave ou descrição parcial."
+      },
+      {
+        "n": "Código de Barras",
+        "d": "Identificação rápida por scanner."
+      },
+      {
+        "n": "Tipo de Produto",
+        "d": "Classifica o item como mercadoria, matéria-prima, embalagem etc."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Marca",
+        "d": "Filtra produtos por marca."
+      },
+      {
+        "n": "Classificação Produto",
+        "d": "Organiza mercadologicamente o produto."
+      },
+      {
+        "n": "Embalagem",
+        "d": "Ajuda controle logístico e de estoque."
+      },
+      {
+        "n": "Mais +",
+        "d": "NCM, fabricante, vasilhame, sazonal, venda controlada e cenário fiscal."
+      }
+    ],
+    "fieldTitle": "Situação do Produto",
+    "fieldMap": [
+      {
+        "k": "OPÇÕES",
+        "v": "Ativo/Inativo/Todos"
+      },
+      {
+        "k": "PADRÃO",
+        "v": "Ativos"
+      },
+      {
+        "k": "AÇÃO",
+        "v": "Toggle status"
+      },
+      {
+        "k": "IMPACTA",
+        "v": "Venda e estoque"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Atualização em tempo real"
+      },
+      {
+        "k": "SAÍDA",
+        "v": "Exportação"
+      }
+    ],
+    "formula": "Produtos ativos ficam disponíveis para operações de venda e movimentação de estoque.",
+    "regras": [
+      "A tabela carrega automaticamente ao acessar a tela.",
+      "Por padrão, lista produtos ativos.",
+      "Toggle de status ativa/desativa produto diretamente na listagem.",
+      "Filtros avançados permitem refinar por NCM, fabricante e cenário fiscal."
+    ],
+    "consulta": [
+      "Cadastro de Produto",
+      "Movimentação de Estoque",
+      "PDV",
+      "Relatórios"
+    ],
+    "links": [
+      "Doc oficial: Consulta de Produto",
+      "Doc oficial: Cadastro de Produto"
+    ],
+    "impactChain": [
+      {
+        "label": "Produto",
+        "tag": "cadastro"
+      },
+      {
+        "label": "Consulta",
+        "tag": "localiza"
+      },
+      {
+        "label": "Estoque/PDV",
+        "tag": "opera"
+      },
+      {
+        "label": "Gestão",
+        "tag": "analisa"
+      }
+    ],
+    "impactList": [
+      "Produto inativo pode não aparecer nas operações.",
+      "Código de barras incorreto dificulta venda no PDV.",
+      "Classificação e NCM impactam fiscal e relatórios."
+    ]
+  },
+  "cadastroProduto": {
+    "title": "Cadastro de Produto",
+    "tipo": "ESTRUTURA",
+    "stageId": "estoque",
+    "subtitle": "Tela para registrar e configurar produtos com dados necessários para venda, compra, estoque, logística e fiscal.",
+    "why": "Produto é uma base central do ERP. Se estiver mal cadastrado, a venda, o estoque, a compra, o fiscal e os relatórios podem apresentar divergências.",
+    "cycleTitle": "Ciclo do produto",
+    "cycleSub": "Da criação do item ao uso nas operações.",
+    "lifecycle": [
+      {
+        "step": "DADOS",
+        "label": "Código e descrições"
+      },
+      {
+        "step": "TIPO",
+        "label": "Tipo de produto"
+      },
+      {
+        "step": "AQUI",
+        "label": "Cadastro de Produto",
+        "hot": true
+      },
+      {
+        "step": "EMBALAGEM",
+        "label": "GTIN, quantidade, pesável"
+      },
+      {
+        "step": "CLASSIFICA",
+        "label": "Família, marca, fiscal"
+      },
+      {
+        "step": "USO",
+        "label": "PDV, estoque, compra"
+      }
+    ],
+    "quemUsa": [
+      "Cadastro",
+      "Estoque",
+      "Compras",
+      "Fiscal",
+      "PDV"
+    ],
+    "quando": "Quando um novo produto precisa ser vendido, comprado, movimentado ou analisado no sistema.",
+    "antes": [
+      "Definição do item",
+      "Marca, família e embalagem",
+      "Necessidade de uso no estoque ou PDV"
+    ],
+    "depois": [
+      "Consulta de Produto",
+      "Venda no PDV",
+      "Movimentação de Estoque",
+      "Compra e relatórios"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Código",
+        "d": "Preenchido automaticamente após a criação."
+      },
+      {
+        "n": "Descrição",
+        "d": "Identificação principal do item."
+      },
+      {
+        "n": "Descrição Cupom",
+        "d": "Nome exibido no cupom fiscal."
+      },
+      {
+        "n": "Descrição Gôndola",
+        "d": "Nome usado na prateleira/gôndola."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Tipo de Produto",
+        "d": "Classifica como mercadoria, matéria-prima, embalagem, serviço, ativo imobilizado etc."
+      },
+      {
+        "n": "Embalagem",
+        "d": "Identifica formato para logística e estoque."
+      },
+      {
+        "n": "Quantidade Embalagem",
+        "d": "Quantidade de unidades por embalagem."
+      },
+      {
+        "n": "Pesável",
+        "d": "Indica produtos por peso, como frutas e carnes."
+      }
+    ],
+    "fieldTitle": "Tipo de Produto",
+    "fieldMap": [
+      {
+        "k": "USO",
+        "v": "Classificação"
+      },
+      {
+        "k": "REGRA",
+        "v": "Um tipo principal"
+      },
+      {
+        "k": "EXEMPLO",
+        "v": "Mercadoria revenda"
+      },
+      {
+        "k": "IMPACTA",
+        "v": "PDV e estoque"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Principal incorreto"
+      },
+      {
+        "k": "CONEXÃO",
+        "v": "Compra/Fiscal"
+      }
+    ],
+    "formula": "O tipo principal deve representar a maior saída do produto.",
+    "regras": [
+      "Apenas um tipo de produto pode conter a opção Principal.",
+      "Códigos GTIN adicionais devem ser usados para outros formatos de embalagem do mesmo produto.",
+      "Foto aceita .png, .svg, .jpeg ou .jpg, com tamanho máximo de 5MB.",
+      "Marca, família e classificação facilitam busca, balanço e gestão de estoque/vendas."
+    ],
+    "consulta": [
+      "Consulta de Produto",
+      "Movimentação de Estoque",
+      "PDV",
+      "Fiscal"
+    ],
+    "links": [
+      "Doc oficial: Cadastro de Produto",
+      "Doc oficial: Consulta de Produto"
+    ],
+    "impactChain": [
+      {
+        "label": "Cadastro",
+        "tag": "define"
+      },
+      {
+        "label": "Produto ativo",
+        "tag": "disponibiliza"
+      },
+      {
+        "label": "PDV/Estoque",
+        "tag": "usa"
+      },
+      {
+        "label": "Relatórios",
+        "tag": "mede"
+      }
+    ],
+    "impactList": [
+      "Tipo ou embalagem incorreta afeta venda e estoque.",
+      "Descrição cupom incorreta aparece para o cliente.",
+      "GTIN errado impacta scanner e operação de caixa."
+    ]
+  },
+  "movimentacaoEstoque": {
+    "title": "Movimentação de Estoque",
+    "tipo": "FLUXO OPERACIONAL",
+    "stageId": "estoque",
+    "subtitle": "Tela para registrar entradas, saídas, ajustes e transferências que alteram o saldo do produto em determinado local de estoque.",
+    "why": "Permite corrigir e controlar o saldo físico do estoque. Cada movimentação altera estoque atual/final e precisa ficar rastreável por loja, produto, operação, motivo e observação.",
+    "cycleTitle": "Ciclo da movimentação",
+    "cycleSub": "Do lançamento ao reflexo no extrato.",
+    "lifecycle": [
+      {
+        "step": "LOJA",
+        "label": "Seleciona loja"
+      },
+      {
+        "step": "PRODUTO",
+        "label": "Produto e local"
+      },
+      {
+        "step": "AQUI",
+        "label": "Movimentação",
+        "hot": true
+      },
+      {
+        "step": "OPERAÇÃO",
+        "label": "Entrada ou saída"
+      },
+      {
+        "step": "FINALIZA",
+        "label": "Finalizado/estornado"
+      },
+      {
+        "step": "EXTRATO",
+        "label": "Extrato de movimentação"
+      }
+    ],
+    "quemUsa": [
+      "Estoque",
+      "Operação",
+      "Compras",
+      "Suporte",
+      "QA"
+    ],
+    "quando": "Quando precisa ajustar saldo, registrar entrada/saída ou consultar movimentações por loja, produto, data, usuário ou situação.",
+    "antes": [
+      "Produto cadastrado",
+      "Loja ativa",
+      "Local de estoque origem/destino",
+      "Tipo de operação e motivo cadastrados"
+    ],
+    "depois": [
+      "Estoque final recalculado",
+      "Situação finalizada ou aberta",
+      "Registro aparece no Extrato de Movimentação",
+      "Pode ser consultado por filtros"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Loja",
+        "d": "Determina opções de Local Estoque Origem e Destino."
+      },
+      {
+        "n": "Data Movimento",
+        "d": "Preenchida com o dia atual, mas pode ser alterada com limite de retroatividade."
+      },
+      {
+        "n": "Código Produto",
+        "d": "Seleciona produto que terá estoque ajustado."
+      },
+      {
+        "n": "Situação",
+        "d": "Gerenciada pelo sistema: aberto, finalizado ou estornado."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Tipo de Operação",
+        "d": "Define entrada ou saída."
+      },
+      {
+        "n": "Categoria",
+        "d": "Opções limitadas conforme tipo de operação."
+      },
+      {
+        "n": "Quantidade Ajuste",
+        "d": "Referência para cálculo do estoque final."
+      },
+      {
+        "n": "Motivo / Observação",
+        "d": "Motivo vem do cadastro e observação é obrigatória."
+      }
+    ],
+    "fieldTitle": "Estoque Final",
+    "fieldMap": [
+      {
+        "k": "TIPO",
+        "v": "Calculado"
+      },
+      {
+        "k": "DEPENDE DE",
+        "v": "Atual + operação"
+      },
+      {
+        "k": "ENTRADA",
+        "v": "Soma quantidade"
+      },
+      {
+        "k": "SAÍDA",
+        "v": "Subtrai quantidade"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Cálculo/estorno"
+      },
+      {
+        "k": "APARECE EM",
+        "v": "Extrato"
+      }
+    ],
+    "formula": "Estoque Final = Estoque Atual ± Quantidade Ajuste, conforme a operação.",
+    "regras": [
+      "Não é possível lançar movimentações retroativas com mais de 30 dias considerando a data atual.",
+      "Situação é bloqueada para alteração manual e gerenciada por finalizar/estornar.",
+      "Ao estornar, o registro volta para Aberto e desfaz a movimentação realizada.",
+      "Observação é obrigatória e aparece no Extrato de Movimentação."
+    ],
+    "consulta": [
+      "Consulta Movimentação de Estoque",
+      "Extrato de Movimentação",
+      "Consulta de Produto",
+      "Relatórios de estoque"
+    ],
+    "links": [
+      "Doc oficial: Movimentação de Estoque",
+      "Doc oficial: Consulta Movimentação de Estoque"
+    ],
+    "impactChain": [
+      {
+        "label": "Produto/Local",
+        "tag": "origem"
+      },
+      {
+        "label": "Movimentação",
+        "tag": "ajusta"
+      },
+      {
+        "label": "Estoque Final",
+        "tag": "recalcula"
+      },
+      {
+        "label": "Venda/Relatórios",
+        "tag": "impacta"
+      }
+    ],
+    "impactList": [
+      "Saldo errado pode liberar ou impedir venda indevidamente.",
+      "Estorno precisa desfazer exatamente a movimentação.",
+      "Loja/local incorretos geram divergência de estoque."
+    ]
+  },
+  "contaPagar": {
+    "title": "Conta a Pagar",
+    "tipo": "FLUXO OPERACIONAL",
+    "stageId": "financeiro",
+    "subtitle": "Consulta e lançamento de títulos que representam valores que a empresa precisa pagar.",
+    "why": "Organiza títulos gerados por nota fiscal, devolução de clientes ou lançamento manual, permitindo acompanhar vencidos, abertos, baixados e totais antes da baixa financeira.",
+    "cycleTitle": "Ciclo de vida do título",
+    "cycleSub": "Da origem do título até baixa e reflexo financeiro.",
+    "lifecycle": [
+      {
+        "step": "ORIGEM",
+        "label": "NF, devolução ou manual"
+      },
+      {
+        "step": "CONSULTA",
+        "label": "Filtros e painel"
+      },
+      {
+        "step": "AQUI",
+        "label": "Conta a Pagar",
+        "hot": true
+      },
+      {
+        "step": "LANÇA",
+        "label": "Lançamento manual"
+      },
+      {
+        "step": "BAIXA",
+        "label": "Baixa / estorno"
+      },
+      {
+        "step": "RELATÓRIO",
+        "label": "Exporta e analisa"
+      }
+    ],
+    "quemUsa": [
+      "Financeiro",
+      "Contas a pagar",
+      "Compras",
+      "Contabilidade",
+      "Suporte"
+    ],
+    "quando": "Quando precisa consultar, lançar, cancelar, estornar ou acompanhar títulos a pagar por vencimento, emissão, baixa, pessoa ou valor.",
+    "antes": [
+      "Recebimento de nota fiscal",
+      "Devolução de cliente",
+      "Tipo de movimentação e forma de pagamento",
+      "Pessoa e fonte pagadora cadastradas"
+    ],
+    "depois": [
+      "Baixa do título",
+      "Fluxo de caixa/Tesouraria",
+      "Relatórios financeiros",
+      "Possível lançamento contábil"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Lançamento",
+        "d": "Número do título para consulta."
+      },
+      {
+        "n": "Origem",
+        "d": "Manual, nota fiscal, PDV etc."
+      },
+      {
+        "n": "Situação",
+        "d": "Filtra aberto, baixado, cancelado e outras situações."
+      },
+      {
+        "n": "Pessoa / Fonte Pagadora",
+        "d": "Pessoa responsável e quem realmente paga."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Período Emissão",
+        "d": "Data em que a conta foi registrada."
+      },
+      {
+        "n": "Período Vencimento",
+        "d": "Vencimento ou período de vencimento."
+      },
+      {
+        "n": "Período Baixa",
+        "d": "Quando o título foi baixado."
+      },
+      {
+        "n": "Valor Min/Max",
+        "d": "Refina por faixa de valor."
+      }
+    ],
+    "fieldTitle": "Painel de Totais",
+    "fieldMap": [
+      {
+        "k": "TOTAL VENCIDO",
+        "v": "Vencidos sem baixa"
+      },
+      {
+        "k": "TOTAL ABERTO",
+        "v": "Em aberto e em dia"
+      },
+      {
+        "k": "TOTAL BAIXADO",
+        "v": "Já baixados"
+      },
+      {
+        "k": "TOTAL",
+        "v": "Soma geral"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Total x filtro"
+      },
+      {
+        "k": "SAÍDA",
+        "v": "Relatório/Excel"
+      }
+    ],
+    "formula": "Total = Vencido + Aberto + Baixado, conforme filtros aplicados.",
+    "regras": [
+      "Cancelar muda a situação do título selecionado para cancelado.",
+      "Estornar permite reverter título já cancelado quando selecionado.",
+      "A consulta permite exportar resultados em relatório, Excel ou arquivo.",
+      "Alterar colunas só se torna efetivo após salvar a configuração da tabela."
+    ],
+    "consulta": [
+      "Consulta de Conta a Pagar",
+      "Lançamento de Conta a Pagar",
+      "Baixa de Título",
+      "Relatórios financeiros"
+    ],
+    "links": [
+      "Doc oficial: Conta a Pagar",
+      "Doc oficial: Baixa de Título"
+    ],
+    "impactChain": [
+      {
+        "label": "Origem do título",
+        "tag": "NF/manual"
+      },
+      {
+        "label": "Conta a Pagar",
+        "tag": "consulta"
+      },
+      {
+        "label": "Baixa",
+        "tag": "liquida"
+      },
+      {
+        "label": "Tesouraria/Relatório",
+        "tag": "impacta"
+      }
+    ],
+    "impactList": [
+      "Situação do título muda o painel de totais.",
+      "Filtros de data e valor alteram relatórios e exportações.",
+      "Pessoa e fonte pagadora incorretas dificultam conciliação."
+    ]
+  },
+  "contaReceber": {
+    "title": "Conta a Receber",
+    "tipo": "FLUXO OPERACIONAL",
+    "stageId": "financeiro",
+    "subtitle": "Consulta e lançamento de títulos que representam valores que a empresa tem a receber.",
+    "why": "Concentra títulos a receber vindos automaticamente de vendas no PDV e notas fiscais, além de permitir lançamentos manuais e acompanhar vencidos, abertos e baixados.",
+    "cycleTitle": "Ciclo do recebível",
+    "cycleSub": "Da venda ou nota até a baixa.",
+    "lifecycle": [
+      {
+        "step": "ORIGEM",
+        "label": "PDV ou NF"
+      },
+      {
+        "step": "CONSULTA",
+        "label": "Filtros e painel"
+      },
+      {
+        "step": "AQUI",
+        "label": "Conta a Receber",
+        "hot": true
+      },
+      {
+        "step": "LANÇA",
+        "label": "Manual se necessário"
+      },
+      {
+        "step": "BAIXA",
+        "label": "Baixa/estorno"
+      },
+      {
+        "step": "GESTÃO",
+        "label": "Relatórios"
+      }
+    ],
+    "quemUsa": [
+      "Financeiro",
+      "Contas a receber",
+      "Frente de caixa",
+      "Suporte",
+      "Gestão"
+    ],
+    "quando": "Quando precisa consultar recebíveis por origem, situação, título, pessoa, fonte pagadora, PDV, cupom, vencimento ou valor.",
+    "antes": [
+      "Venda no PDV",
+      "Emissão de nota fiscal",
+      "Pessoa/fonte pagadora",
+      "Forma de pagamento"
+    ],
+    "depois": [
+      "Baixa do recebível",
+      "Atualização dos totais",
+      "Tesouraria/caixa",
+      "Relatórios financeiros"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Origem",
+        "d": "Manual, nota fiscal, PDV etc."
+      },
+      {
+        "n": "Situação",
+        "d": "Aberto, baixado, cancelado e outras situações."
+      },
+      {
+        "n": "PDV / Nº Cupom",
+        "d": "Rastreia recebíveis originados no caixa."
+      },
+      {
+        "n": "Pessoa / Fonte Pagadora",
+        "d": "Responsável e quem realmente pagou."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Período Emissão",
+        "d": "Quando a conta foi registrada."
+      },
+      {
+        "n": "Período Vencimento",
+        "d": "Vencida ou a vencer."
+      },
+      {
+        "n": "Período Baixa",
+        "d": "Quando foi liquidada."
+      },
+      {
+        "n": "Observação",
+        "d": "Busca por observações do título."
+      }
+    ],
+    "fieldTitle": "Totais da Consulta",
+    "fieldMap": [
+      {
+        "k": "VENCIDO",
+        "v": "A receber atrasado"
+      },
+      {
+        "k": "ABERTO",
+        "v": "Em dia sem baixa"
+      },
+      {
+        "k": "BAIXADO",
+        "v": "Recebido"
+      },
+      {
+        "k": "TOTAL",
+        "v": "Todos os status"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Cards x grid"
+      },
+      {
+        "k": "ORIGEM",
+        "v": "PDV/NF/manual"
+      }
+    ],
+    "formula": "Painéis dependem dos filtros e das situações dos títulos listados.",
+    "regras": [
+      "Vendas do PDV e notas fiscais entram automaticamente na consulta.",
+      "Cancelar altera situação do título selecionado para cancelado.",
+      "Estornar permite reverter título cancelado selecionado.",
+      "Exportação permite gerar relatório, planilha ou arquivo texto."
+    ],
+    "consulta": [
+      "Consulta de Conta a Receber",
+      "Lançamento de Conta a Receber",
+      "PDV",
+      "Tesouraria"
+    ],
+    "links": [
+      "Doc oficial: Conta a Receber",
+      "Doc oficial: PDV / Financeiro"
+    ],
+    "impactChain": [
+      {
+        "label": "PDV/NF",
+        "tag": "origem"
+      },
+      {
+        "label": "Conta a Receber",
+        "tag": "título"
+      },
+      {
+        "label": "Baixa",
+        "tag": "recebe"
+      },
+      {
+        "label": "Caixa/Gestão",
+        "tag": "impacta"
+      }
+    ],
+    "impactList": [
+      "Recebível vencido muda indicador financeiro.",
+      "PDV e cupom ajudam rastrear origem do valor.",
+      "Baixa incorreta afeta caixa e conciliação."
+    ]
+  },
+  "baixaTitulo": {
+    "title": "Baixa de Título",
+    "tipo": "FLUXO OPERACIONAL",
+    "stageId": "financeiro",
+    "subtitle": "Fluxo de liquidação de títulos a pagar ou a receber, alterando situação, saldo e reflexos financeiros.",
+    "why": "É o momento em que o título deixa de estar em aberto e passa a refletir pagamento ou recebimento. Por isso conecta Conta a Pagar, Conta a Receber, Banco/Conta Corrente, Tesouraria e relatórios.",
+    "cycleTitle": "Ciclo da baixa",
+    "cycleSub": "Do título em aberto ao reflexo no caixa.",
+    "lifecycle": [
+      {
+        "step": "TÍTULO",
+        "label": "Aberto"
+      },
+      {
+        "step": "DADOS",
+        "label": "Conta, forma, valor"
+      },
+      {
+        "step": "AQUI",
+        "label": "Baixa de Título",
+        "hot": true
+      },
+      {
+        "step": "STATUS",
+        "label": "Baixado/estornado"
+      },
+      {
+        "step": "CAIXA",
+        "label": "Tesouraria"
+      },
+      {
+        "step": "RELATÓRIO",
+        "label": "Financeiro"
+      }
+    ],
+    "quemUsa": [
+      "Financeiro",
+      "Tesouraria",
+      "Contabilidade",
+      "Suporte",
+      "QA"
+    ],
+    "quando": "Quando um título a pagar ou a receber precisa ser liquidado, cancelado, conferido ou estornado.",
+    "antes": [
+      "Título em aberto",
+      "Conta corrente/banco cadastrado",
+      "Forma de pagamento",
+      "Pessoa/fonte pagadora definida"
+    ],
+    "depois": [
+      "Situação do título muda",
+      "Valor entra ou sai do caixa",
+      "Relatórios e totais são atualizados",
+      "Conciliação pode ser impactada"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Título",
+        "d": "Registro financeiro a ser liquidado."
+      },
+      {
+        "n": "Valor Baixa",
+        "d": "Valor efetivamente pago ou recebido."
+      },
+      {
+        "n": "Conta Corrente",
+        "d": "Conta que recebe ou paga o valor."
+      },
+      {
+        "n": "Data Baixa",
+        "d": "Data usada para refletir a liquidação."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Estorno",
+        "d": "Reverte uma baixa ou situação conforme regra."
+      },
+      {
+        "n": "Pagamento parcial",
+        "d": "Pode manter saldo em aberto quando aplicável."
+      },
+      {
+        "n": "Juros/Desconto",
+        "d": "Podem alterar valor final."
+      }
+    ],
+    "fieldTitle": "Status do título",
+    "fieldMap": [
+      {
+        "k": "ANTES",
+        "v": "Aberto"
+      },
+      {
+        "k": "AÇÃO",
+        "v": "Baixar"
+      },
+      {
+        "k": "DEPOIS",
+        "v": "Baixado"
+      },
+      {
+        "k": "ESTORNO",
+        "v": "Reverte"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Saldo divergente"
+      },
+      {
+        "k": "IMPACTA",
+        "v": "Tesouraria"
+      }
+    ],
+    "formula": "Saldo em aberto = Valor do título − Valor baixado.",
+    "regras": [
+      "A baixa deve alterar situação e saldo do título.",
+      "Estorno precisa manter rastreabilidade da alteração.",
+      "Baixas impactam consultas, painéis e relatórios financeiros."
+    ],
+    "consulta": [
+      "Conta a Pagar",
+      "Conta a Receber",
+      "Tesouraria",
+      "Relatórios financeiros"
+    ],
+    "links": [
+      "Doc oficial: Conta a Pagar",
+      "Doc oficial: Conta a Receber"
+    ],
+    "impactChain": [
+      {
+        "label": "Título",
+        "tag": "origem"
+      },
+      {
+        "label": "Baixa",
+        "tag": "liquida"
+      },
+      {
+        "label": "Tesouraria",
+        "tag": "caixa"
+      },
+      {
+        "label": "Relatórios",
+        "tag": "gestão"
+      }
+    ],
+    "impactList": [
+      "Baixa altera totais de aberto, vencido e baixado.",
+      "Conta corrente incorreta dificulta conciliação.",
+      "Estorno precisa desfazer reflexo financeiro sem perder histórico."
+    ]
+  },
+  "tesouraria": {
+    "title": "Tesouraria / Visão de Caixa",
+    "tipo": "CONSULTA & CONTROLE",
+    "stageId": "financeiro",
+    "subtitle": "Tela para monitorar PDVs, divergências de caixa, transações por moeda, operador e movimentações financeiras.",
+    "why": "Dá visão operacional do caixa em tempo real, ajudando a conferir valores, identificar divergências e entender vendas, cancelamentos, cartões, abastecimentos e retiradas.",
+    "cycleTitle": "Ciclo da visão de caixa",
+    "cycleSub": "Do PDV aberto à conferência financeira.",
+    "lifecycle": [
+      {
+        "step": "PDV",
+        "label": "Caixa opera"
+      },
+      {
+        "step": "FILTROS",
+        "label": "Loja, período, operador"
+      },
+      {
+        "step": "AQUI",
+        "label": "Visão de Caixa",
+        "hot": true
+      },
+      {
+        "step": "DETALHE",
+        "label": "Moeda, cupons, cartões"
+      },
+      {
+        "step": "MOVIMENTO",
+        "label": "Retirada/abastecimento"
+      },
+      {
+        "step": "GESTÃO",
+        "label": "Relatórios"
+      }
+    ],
+    "quemUsa": [
+      "Tesouraria",
+      "Frente de caixa",
+      "Financeiro",
+      "Gestão",
+      "Suporte"
+    ],
+    "quando": "Quando precisa acompanhar situação dos PDVs, conferir divergências, analisar transações por moeda/operador ou lançar retiradas e abastecimentos.",
+    "antes": [
+      "PDV aberto, pausado ou fechado",
+      "Movimentos de venda e caixa",
+      "Operador e loja definidos"
+    ],
+    "depois": [
+      "Conferência de caixa",
+      "Identificação de divergências",
+      "Relatórios por loja, PDV, operador ou fiscal",
+      "Ajustes de abastecimento/retirada"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Loja",
+        "d": "Escolhe a loja da operação/evento."
+      },
+      {
+        "n": "Período",
+        "d": "Seleciona datas dentro de um intervalo."
+      },
+      {
+        "n": "Operador",
+        "d": "Filtra transações por operador de caixa."
+      },
+      {
+        "n": "PDV",
+        "d": "Filtra um caixa específico."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Situação",
+        "d": "Aberto, em pausa, fechado, finalizados ou todos."
+      },
+      {
+        "n": "Moeda",
+        "d": "Seleciona moeda da operação."
+      },
+      {
+        "n": "Abastecimento/Retirada",
+        "d": "Lança valores em dinheiro com fiscal e observação."
+      },
+      {
+        "n": "Meios de Pagamento",
+        "d": "Detalha transações de cartões por bandeira."
+      }
+    ],
+    "fieldTitle": "Bloco de Totais",
+    "fieldMap": [
+      {
+        "k": "VENDA BRUTA",
+        "v": "Total vendido"
+      },
+      {
+        "k": "VENDA LÍQUIDA",
+        "v": "Após cancelamentos"
+      },
+      {
+        "k": "CANCELADOS",
+        "v": "Cupons/itens/cartões"
+      },
+      {
+        "k": "DINHEIRO",
+        "v": "Saldo por moeda"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Divergência caixa"
+      },
+      {
+        "k": "USO",
+        "v": "Conferência"
+      }
+    ],
+    "formula": "Saldo de caixa considera vendas, moedas, abastecimentos, retiradas e cancelamentos.",
+    "regras": [
+      "Situação filtra PDVs abertos, pausados, fechados, finalizados ou todos.",
+      "Detalhes exibem loja, operador, divergência, datas de entrada/saída e tempo de pausa.",
+      "Totalizador de dinheiro detalha vendas por moeda, abastecimentos, retiradas e saldo.",
+      "Meios de Pagamento detalha transações por cartão e bandeira."
+    ],
+    "consulta": [
+      "Visão de Caixa",
+      "Relatório de Abastecimento e Retirada",
+      "PDV",
+      "Financeiro"
+    ],
+    "links": [
+      "Doc oficial: Tesouraria / Visão de Caixa",
+      "Doc oficial: Relatório de Abastecimento e Retirada"
+    ],
+    "impactChain": [
+      {
+        "label": "PDV",
+        "tag": "origem"
+      },
+      {
+        "label": "Visão de Caixa",
+        "tag": "conferência"
+      },
+      {
+        "label": "Tesouraria",
+        "tag": "controle"
+      },
+      {
+        "label": "Gestão",
+        "tag": "decisão"
+      }
+    ],
+    "impactList": [
+      "Divergência de caixa sinaliza problema operacional.",
+      "Retirada ou abastecimento altera saldo do caixa.",
+      "Transações de cartão precisam bater com comprovantes."
+    ]
+  },
+  "bancoConta": {
+    "title": "Banco e Conta Corrente",
+    "tipo": "ESTRUTURA",
+    "stageId": "financeiro",
+    "subtitle": "Cadastro de bancos e contas correntes usados em pagamentos, recebimentos, baixa de títulos, gaveta e PDVs.",
+    "why": "Define as contas que a empresa usa para movimentar dinheiro. Sem esse cadastro, baixas, pagamentos, recebimentos e tesouraria ficam sem referência correta de conta.",
+    "cycleTitle": "Ciclo da conta corrente",
+    "cycleSub": "Da configuração ao uso em operações financeiras.",
+    "lifecycle": [
+      {
+        "step": "BANCO",
+        "label": "Instituição/conta"
+      },
+      {
+        "step": "CADASTRO",
+        "label": "Banco e conta"
+      },
+      {
+        "step": "AQUI",
+        "label": "Conta Corrente",
+        "hot": true
+      },
+      {
+        "step": "USO",
+        "label": "Baixa de títulos"
+      },
+      {
+        "step": "PDV",
+        "label": "Conta própria"
+      },
+      {
+        "step": "RELATÓRIO",
+        "label": "Consulta/exportação"
+      }
+    ],
+    "quemUsa": [
+      "Financeiro",
+      "Tesouraria",
+      "Implantação",
+      "Suporte",
+      "QA"
+    ],
+    "quando": "Quando a empresa trabalha com um banco/conta para pagamentos, recebimentos, PDV ou tesouraria.",
+    "antes": [
+      "Dados bancários da empresa",
+      "Agência/conta corrente",
+      "Definição de uso em PDV ou financeiro"
+    ],
+    "depois": [
+      "Conta usada na baixa de títulos",
+      "Pagamentos e recebimentos apontam para a conta",
+      "PDV pode ter conta própria na Tesouraria"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Código",
+        "d": "Código interno do cadastro, não o código do banco."
+      },
+      {
+        "n": "Descrição",
+        "d": "Busca bancos internos ou instituições por descrição."
+      },
+      {
+        "n": "Situação",
+        "d": "Ativos, inativos ou todos."
+      },
+      {
+        "n": "Agência",
+        "d": "Filtro no Mais + para contas correntes compatíveis."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Conta Corrente",
+        "d": "Filtro por número de conta corrente."
+      },
+      {
+        "n": "Alterar Colunas",
+        "d": "Personaliza colunas da tabela."
+      },
+      {
+        "n": "Exportar",
+        "d": "Gera relatório, Excel ou arquivo."
+      }
+    ],
+    "fieldTitle": "Conta Corrente",
+    "fieldMap": [
+      {
+        "k": "USO",
+        "v": "Pagamentos/recebimentos"
+      },
+      {
+        "k": "BAIXA",
+        "v": "Aponta conta"
+      },
+      {
+        "k": "TESOURARIA",
+        "v": "PDV/gaveta"
+      },
+      {
+        "k": "FILTRO",
+        "v": "Agência/conta"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Conta errada"
+      },
+      {
+        "k": "SAÍDA",
+        "v": "Relatório"
+      }
+    ],
+    "formula": "Banco/Conta Corrente define para onde o dinheiro entra ou de onde ele sai.",
+    "regras": [
+      "Consulta carrega registros ativos por padrão.",
+      "Agência e Conta Corrente ficam no Mais +.",
+      "Alterar colunas só é efetivado ao salvar a tabela.",
+      "Exportação pode gerar relatório, planilha ou arquivo texto."
+    ],
+    "consulta": [
+      "Consulta Banco e Conta Corrente",
+      "Cadastro Banco e Conta Corrente",
+      "Baixa de Título",
+      "Tesouraria"
+    ],
+    "links": [
+      "Doc oficial: Banco e Conta Corrente",
+      "Doc oficial: Tesouraria"
+    ],
+    "impactChain": [
+      {
+        "label": "Banco/Conta",
+        "tag": "estrutura"
+      },
+      {
+        "label": "Baixa",
+        "tag": "usa"
+      },
+      {
+        "label": "Tesouraria",
+        "tag": "caixa"
+      },
+      {
+        "label": "Relatório",
+        "tag": "consulta"
+      }
+    ],
+    "impactList": [
+      "Conta corrente incorreta afeta conciliação financeira.",
+      "PDV sem conta própria pode dificultar tesouraria.",
+      "Filtro de situação impacta busca e seleção de contas."
+    ]
+  },
+  "planoContas": {
+    "title": "Plano de Contas",
+    "tipo": "ESTRUTURA",
+    "stageId": "contabilidade",
+    "subtitle": "Estrutura usada para organizar contas contábeis e classificar lançamentos financeiros e contábeis.",
+    "why": "Permite consultar, cadastrar, editar e inativar contas contábeis, garantindo que registros financeiros e contábeis sejam classificados de acordo com a estrutura da empresa.",
+    "cycleTitle": "Ciclo contábil",
+    "cycleSub": "Da conta cadastrada à classificação dos lançamentos.",
+    "lifecycle": [
+      {
+        "step": "ESTRUTURA",
+        "label": "Conta contábil"
+      },
+      {
+        "step": "CONSULTA",
+        "label": "Filtros"
+      },
+      {
+        "step": "AQUI",
+        "label": "Plano de Contas",
+        "hot": true
+      },
+      {
+        "step": "CADASTRO",
+        "label": "Código, descrição, conta"
+      },
+      {
+        "step": "LANÇA",
+        "label": "Classificação"
+      },
+      {
+        "step": "DEMONSTRA",
+        "label": "Relatórios"
+      }
+    ],
+    "quemUsa": [
+      "Contabilidade",
+      "Financeiro",
+      "Fiscal",
+      "Implantação",
+      "QA"
+    ],
+    "quando": "Quando precisa estruturar ou localizar contas contábeis para classificar lançamentos financeiros e contábeis.",
+    "antes": [
+      "Estrutura contábil definida",
+      "Necessidade de classificar lançamento",
+      "Conta externa quando houver integração"
+    ],
+    "depois": [
+      "Conta usada em lançamentos",
+      "Balancetes e demonstrativos",
+      "Integrações externas quando aplicável"
+    ],
+    "camposPrinc": [
+      {
+        "n": "Código",
+        "d": "Identificador único da conta contábil."
+      },
+      {
+        "n": "Descrição",
+        "d": "Nome da conta contábil e campo obrigatório."
+      },
+      {
+        "n": "Conta",
+        "d": "Classificação ou estrutura interna da conta."
+      },
+      {
+        "n": "Conta Externa",
+        "d": "Usada para integração externa quando aplicável."
+      }
+    ],
+    "camposCond": [
+      {
+        "n": "Período de Inclusão",
+        "d": "Filtra pela data em que a conta foi cadastrada."
+      },
+      {
+        "n": "Período de Alteração",
+        "d": "Filtra pela última alteração."
+      },
+      {
+        "n": "Situação",
+        "d": "Seleciona contas ativas ou inativas."
+      }
+    ],
+    "fieldTitle": "Descrição",
+    "fieldMap": [
+      {
+        "k": "TIPO",
+        "v": "Texto"
+      },
+      {
+        "k": "OBRIGATÓRIO",
+        "v": "Sim"
+      },
+      {
+        "k": "USO",
+        "v": "Nome da conta"
+      },
+      {
+        "k": "IMPACTA",
+        "v": "Lançamentos"
+      },
+      {
+        "k": "RISCO QA",
+        "v": "Conta duplicada"
+      },
+      {
+        "k": "CONSULTA",
+        "v": "Filtro descrição"
+      }
+    ],
+    "formula": "Conta contábil correta = lançamento financeiro classificado corretamente.",
+    "regras": [
+      "Consulta executa busca ao clicar em Consultar.",
+      "Incluir abre modal para cadastro de nova conta contábil.",
+      "Situação permite filtrar contas ativas ou inativas.",
+      "Conta Externa é usada quando houver integração com sistemas externos."
+    ],
+    "consulta": [
+      "Consulta Plano de Contas",
+      "Cadastro Plano de Contas",
+      "Lançamentos Contábeis",
+      "Balancete"
+    ],
+    "links": [
+      "Doc oficial: Plano de Contas"
+    ],
+    "impactChain": [
+      {
+        "label": "Plano de Contas",
+        "tag": "estrutura"
+      },
+      {
+        "label": "Lançamento",
+        "tag": "classifica"
+      },
+      {
+        "label": "Contabilidade",
+        "tag": "apura"
+      },
+      {
+        "label": "Gestão",
+        "tag": "relata"
+      }
+    ],
+    "impactList": [
+      "Conta errada classifica lançamento incorretamente.",
+      "Conta inativa pode impedir uso em novos registros.",
+      "Integração externa depende do código correto."
+    ]
+  }
+};
+function currentFeature(){ return FEATURE_DATA[state.featureId] || FEATURE_DATA.contaPagar; }
+
+/* -------- Estado da aplicação -------- */
+var state = { screen:'home', stageId:'financeiro', featureId:'contaPagar', lens:'novo' };
+
+/* -------- Helpers -------- */
+function h(html){ return html; }
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function chips(list, cls){ cls = cls || 'chip'; return list.map(function(x){ return '<span class="'+cls+'">'+esc(x)+'</span>'; }).join(''); }
+
+/* ============================================================
+   RENDER — Home (fita de fluxo + intenções)
+   ============================================================ */
+function renderHome(){
+  // Home fica intencionalmente simples: proposta + começar a explorar.
+}
+
+/* ============================================================
+   RENDER — Mapa macro (linha de metrô)
+   ============================================================ */
+function renderMap(){
+  // Fluxo macro em cards (mantido como tela principal de exploração)
+  var ribbon = el('ribbon');
+  if (ribbon){
+    ribbon.innerHTML = ORDER.map(function(k,i){
+      var st = STAGES[k];
+      return '<div class="ribbon__item">'
+        + '<button class="station-chip" data-stage-card="'+k+'" onclick="Atlas.go(\'module\',\''+k+'\')">'
+        +   '<span class="station-chip__icon">'+ICON[k]+'</span>'
+        +   '<span><span class="station-chip__num">'+String(i+1).padStart(2,'0')+'</span>'
+        +   '<span class="station-chip__label">'+esc(st.label)+'</span></span>'
+        + '</button>'
+        + (i < ORDER.length-1 ? ARROW_H : '')
+        + '</div>';
+    }).join('');
+  }
+  renderViewSelector();
+}
+
+function renderViewSelector(){
+  var box = el('view-selector');
+  if (!box) return;
+  var desc = {
+    novo:'Conceitos, glossário, exemplos práticos e fluxo básico.',
+    qa:'Riscos, testes, regressão, campos críticos e perguntas para PO.',
+    po:'Regras de negócio, critérios de aceite, dependências e refinamento.',
+    suporte:'Dúvidas frequentes, erros comuns, causas prováveis e onde consultar.',
+    dev:'Comportamento esperado, dependências funcionais e impactos técnicos.'
+  };
+  box.innerHTML = LENSES.map(function(l){
+    var on = state.lens === l.id;
+    var style = on ? 'background:'+l.bg+';border-color:'+l.border : '';
+    return '<button class="lens-choice'+(on?' is-active':'')+'" style="'+style+'" onclick="Atlas.setLens(\''+l.id+'\')">'
+      + '<span class="lens-choice__top"><span class="lens-choice__dot" style="background:'+l.dot+'"></span><span class="lens-choice__title">'+esc(l.label)+'</span></span>'
+      + '<p class="lens-choice__desc">'+esc(desc[l.id])+'</p>'
+      + '</button>';
+  }).join('');
+}
+
+/* ============================================================
+   RENDER — Módulo (data-driven a partir de STAGES)
+   ============================================================ */
+function renderModule(){
+  var id = state.stageId, s = STAGES[id];
+
+  // Cabeçalho
+  el('module-icon').innerHTML = ICON[id];
+  el('module-tipo').textContent = s.tipo;
+  el('module-name').textContent = s.label;
+  el('module-why').textContent = s.porque;
+
+  // Fluxos/telas — qualquer item com key abre uma funcionalidade documentada
+  el('module-telas').innerHTML = s.telas.map(function(t){
+    var openable = !!t.key && FEATURE_DATA[t.key];
+    var ts = TIPO_STYLE[t.tipo] || TIPO_STYLE['Fluxo'];
+    var icon = t.tipo === 'Estrutura' ? ICON.contabilidade : (t.tipo === 'Consulta' ? ICON.gestao : ICON.financeiro);
+    var badge = openable
+      ? '<span class="tela__badge" style="color:var(--orange-700);background:var(--orange-soft)">Abrir →</span>'
+      : '<span class="tela__badge" style="color:var(--muted-2);background:var(--subtle)">'+esc(t.tipo)+'</span>';
+    return '<button class="tela'+(openable?' is-openable':'')+'" '+(openable?'onclick="Atlas.go(\'feature\',\''+t.key+'\')"':'')+'>'
+      + '<span class="tela__icon" style="background:'+ts.bg+';color:'+ts.ink+'">'+icon+'</span>'
+      + '<span style="flex:1;min-width:0"><span class="tela__name">'+esc(t.name)+'</span><span class="tela__tipo">'+esc(t.tipo)+'</span>'
+      + (t.doc ? '<span class="tela__doc">'+esc(t.doc)+'</span>' : '')
+      + '</span>'
+      + badge
+      + '</button>';
+  }).join('');
+
+  // Painéis de conexão
+  el('module-alimenta').innerHTML = chips(s.alimenta);
+  el('module-impacta').innerHTML = chips(s.impacta);
+  el('module-conexoes').innerHTML = chips(s.conexoes, 'chip chip--orange');
+}
+
+/* ============================================================
+   RENDER — Funcionalidade (anatomia fixa + lente dinâmica)
+   ============================================================ */
+function renderFeatureStatic(){
+  var FEATURE = currentFeature();
+  state.stageId = FEATURE.stageId || state.stageId;
+
+  // Cabeçalho e contexto
+  if (el('feature-tipo')) el('feature-tipo').textContent = FEATURE.tipo || 'FUNCIONALIDADE';
+  if (el('feature-title')) el('feature-title').textContent = FEATURE.title;
+  if (el('feature-subtitle')) el('feature-subtitle').textContent = FEATURE.subtitle || '';
+  if (el('feature-why')) el('feature-why').innerHTML = esc(FEATURE.why || '');
+  if (el('feature-cycle-title')) el('feature-cycle-title').textContent = FEATURE.cycleTitle || 'Ciclo de vida';
+  if (el('feature-cycle-sub')) el('feature-cycle-sub').textContent = FEATURE.cycleSub || 'De onde nasce e para onde vai.';
+  if (el('quando-usa')) el('quando-usa').textContent = FEATURE.quando || '';
+  if (el('fieldmap-title')) el('fieldmap-title').textContent = FEATURE.fieldTitle || 'Campo-chave';
+  if (el('fieldmap-formula')) el('fieldmap-formula').textContent = FEATURE.formula || '';
+
+  // Ciclo de vida
+  el('lifecycle').innerHTML = FEATURE.lifecycle.map(function(c,i,arr){
+    return '<div class="lifecycle__item">'
+      + '<div class="life-step'+(c.hot?' is-hot':'')+'"><span class="life-step__num">'+esc(c.step)+'</span><span class="life-step__label">'+esc(c.label)+'</span></div>'
+      + (i < arr.length-1 ? '<svg class="arrow-h" width="20" height="16" viewBox="0 0 20 16" fill="none"><path d="M2 8h13M11 3l5 5-5 5" stroke="#FF6A00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
+      + '</div>';
+  }).join('');
+
+  el('quem-usa').innerHTML = chips(FEATURE.quemUsa || []);
+  el('antes').innerHTML = (FEATURE.antes || []).map(function(a){ return '<span><span class="bullet">•</span>'+esc(a)+'</span>'; }).join('');
+  el('depois').innerHTML = (FEATURE.depois || []).map(function(a){ return '<span><span class="bullet">•</span>'+esc(a)+'</span>'; }).join('');
+
+  function fieldRows(list){ return (list || []).map(function(f){ return '<div class="field-item"><span class="n">'+esc(f.n)+'</span><span class="d">'+esc(f.d)+'</span></div>'; }).join(''); }
+  el('campos-princ').innerHTML = fieldRows(FEATURE.camposPrinc);
+  el('campos-cond').innerHTML = fieldRows(FEATURE.camposCond);
+
+  el('fieldmap').innerHTML = (FEATURE.fieldMap || []).map(function(m){ return '<div><span class="fieldmap__k">'+esc(m.k)+'</span><span class="fieldmap__v">'+esc(m.v)+'</span></div>'; }).join('');
+
+  el('regras').innerHTML = (FEATURE.regras || []).map(function(r){
+    return '<div class="rule"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#22B54C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M20 6 9 17l-5-5"/></svg><span>'+esc(r)+'</span></div>';
+  }).join('');
+
+  el('consulta').innerHTML = chips(FEATURE.consulta || [], 'chip chip--blue');
+  el('links').innerHTML = (FEATURE.links || []).map(function(l){
+    return '<a><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>'+esc(l)+'</a>';
+  }).join('');
+}
+
+function buildLensContent(lens, f){
+  var before = (f.antes || []).slice(0,2);
+  var after = (f.depois || []).slice(0,2);
+  var rules = (f.regras || []).slice(0,3);
+  var fields = (f.camposPrinc || []).slice(0,3).map(function(x){ return x.n + ': ' + x.d; });
+  var cond = (f.camposCond || []).slice(0,2).map(function(x){ return x.n + ': ' + x.d; });
+  var impacts = (f.impactList || []).slice(0,3);
+  var consultas = (f.consulta || []).slice(0,3);
+  if (lens === 'novo'){
+    return {title:'Novo Colaborador',intro:'Comece por aqui para entender a funcionalidade sem cair direto em regra solta.',blocks:[
+      {h:'EM UMA FRASE',mark:'›',items:[f.subtitle || f.why]},
+      {h:'ANTES DE CHEGAR AQUI',mark:'←',items: before.length?before:['Dados de origem precisam existir antes desta tela.']},
+      {h:'O QUE ACONTECE DEPOIS',mark:'→',items: after.length?after:['A informação alimenta outras consultas e processos.']},
+      {h:'TERMOS PARA NÃO SE PERDER',mark:'•',items:[f.title, (f.tipo || 'Funcionalidade'), 'Campo-chave: '+(f.fieldTitle || 'ver campos que importam')]}
+    ]};
+  }
+  if (lens === 'qa'){
+    return {title:'QA',intro:'Pontos para validar comportamento, risco e regressão a partir da documentação.',blocks:[
+      {h:'RISCOS',mark:'!',items: impacts.length?impacts:['Dado incorreto pode refletir em módulos conectados.']},
+      {h:'CENÁRIOS DE TESTE',mark:'✓',items:['Validar filtros, carregamento padrão e paginação quando houver consulta.','Validar campos obrigatórios, bloqueados, calculados e condicionais.','Validar alteração de status, cancelamento, estorno ou inativação quando existir.']},
+      {h:'CAMPOS CRÍTICOS',mark:'•',items: fields.length?fields:['Revisar campos principais da tela.']},
+      {h:'REGRESSÃO SUGERIDA',mark:'↻',items: (f.consulta || []).slice(0,3)}
+    ]};
+  }
+  if (lens === 'po'){
+    return {title:'PO',intro:'Regras, dependências e decisões que precisam estar claras antes de refinar.',blocks:[
+      {h:'REGRAS DE NEGÓCIO',mark:'•',items: rules.length?rules:['Definir regra principal da funcionalidade.']},
+      {h:'CRITÉRIOS DE ACEITE',mark:'✓',items:['Deve respeitar o comportamento descrito na documentação oficial.','Deve refletir corretamente nos módulos impactados.','Deve deixar claro quais campos são obrigatórios, automáticos, bloqueados ou condicionais.']},
+      {h:'DEPENDÊNCIAS',mark:'→',items: before.length?before:['Mapear cadastros e origens necessárias.']},
+      {h:'PERGUNTAS PARA REFINAMENTO',mark:'?',items:['O que acontece quando o registro está inativo, cancelado ou estornado?','Quais campos podem ser editados depois de salvar?','Quais relatórios ou telas devem refletir essa alteração?']}
+    ]};
+  }
+  if (lens === 'suporte'){
+    return {title:'Suporte',intro:'Onde consultar, quais causas investigar e como orientar o usuário.',blocks:[
+      {h:'ONDE CONSULTAR',mark:'→',items: consultas.length?consultas:['Consulta principal da funcionalidade.']},
+      {h:'DÚVIDAS FREQUENTES',mark:'?',items:['Por que o registro não aparece na consulta?','Qual filtro ou situação pode estar escondendo o registro?','Onde vejo o impacto depois de salvar ou baixar?']},
+      {h:'CAUSAS PROVÁVEIS',mark:'•',items: cond.length?cond:['Filtro, status ou cadastro de origem incorreto.']},
+      {h:'O QUE CONFIRMAR COM O CLIENTE',mark:'✓',items:['Loja, período, situação e identificação do registro.','Se houve cancelamento, estorno, inativação ou alteração recente.']}
+    ]};
+  }
+  return {title:'DEV',intro:'Comportamento esperado, dependências e impactos técnicos da funcionalidade.',blocks:[
+    {h:'COMPORTAMENTO ESPERADO',mark:'•',items: rules.length?rules:['Implementar conforme regra de negócio documentada.']},
+    {h:'DEPENDÊNCIAS FUNCIONAIS',mark:'→',items: before.concat(after).slice(0,4)},
+    {h:'INTEGRAÇÕES/REFLEXOS',mark:'⇄',items: (f.impactChain || []).map(function(x){ return x.label + ' (' + x.tag + ')'; }).slice(0,4)},
+    {h:'PONTOS TÉCNICOS DE ATENÇÃO',mark:'!',items:['Evitar divergência entre cards, grid, consulta e exportação.','Garantir que filtros e status usem a mesma fonte de regra.','Manter rastreabilidade em operações como inativação, cancelamento, baixa ou estorno.']}
+  ]};
+}
+
+/* Abas de lente + painel da lente */
+function renderLens(){
+  if (!el('lens-tabs') || !el('lenspanel')) return;
+  var lens = state.lens;
+  // Abas
+  el('lens-tabs').innerHTML = LENSES.map(function(l){
+    var on = (l.id === lens);
+    var style = on ? 'background:'+l.bg+';color:'+l.ink+';border-color:'+l.border : '';
+    return '<button class="lens-tab'+(on?' is-active':'')+'" style="'+style+'" onclick="Atlas.setLens(\''+l.id+'\')">'
+      + '<span class="dot" style="background:'+l.dot+'"></span>'+esc(l.label)
+      + '</button>';
+  }).join('');
+
+  // Painel
+  var meta = LENSES.filter(function(l){ return l.id === lens; })[0];
+  var c = buildLensContent(lens, currentFeature());
+  var blocks = c.blocks.map(function(b){
+    var items = b.items.map(function(it){
+      return '<div class="lens-item" style="background:'+meta.bg+';border:1px solid '+meta.border+'"><span class="mark" style="color:'+meta.dot+'">'+esc(b.mark)+'</span><span class="txt">'+esc(it)+'</span></div>';
+    }).join('');
+    return '<div class="lens-block"><div class="lens-block__h" style="color:'+meta.ink+'"><span class="dot" style="background:'+meta.dot+'"></span>'+esc(b.h)+'</div><div class="lens-block__items">'+items+'</div></div>';
+  }).join('');
+
+  el('lenspanel').style.borderColor = meta.border;
+  el('lenspanel').innerHTML =
+    '<div class="lenspanel__head" style="background:'+meta.bg+';border-bottom-color:'+meta.border+'">'
+    +   '<span class="lenspanel__icon" style="color:'+meta.ink+'">'+LENS_ICON[lens]+'</span>'
+    +   '<div><span class="lenspanel__eyebrow" style="color:'+meta.ink+'">LENTE</span><span class="lenspanel__title">'+esc(c.title)+'</span></div>'
+    + '</div>'
+    + '<div class="lenspanel__body"><p class="lenspanel__intro">'+esc(c.intro)+'</p>'+blocks+'</div>';
+}
+
+/* ============================================================
+   RENDER — Mapa de impacto
+   ============================================================ */
+function renderImpact(){
+  var FEATURE = currentFeature();
+  if (el('impact-title')) el('impact-title').textContent = 'Mapa de impacto — ' + FEATURE.title;
+  if (el('impact-subtitle')) el('impact-subtitle').textContent = 'Se você mexe em ' + FEATURE.title + ', veja o que se move junto. Cada seta é uma dependência real entre módulos.';
+  if (el('impact-central-label')) el('impact-central-label').textContent = FEATURE.title;
+
+  el('impact-chain').innerHTML = (FEATURE.impactChain || []).map(function(n,i,arr){
+    return '<div class="impact-chain__item">'
+      + '<div class="impact-box"><span class="l">'+esc(n.label)+'</span><span class="t">'+esc(n.tag)+'</span></div>'
+      + (i < arr.length-1 ? '<svg class="arrow-h" width="30" height="16" viewBox="0 0 30 16" fill="none"><path d="M2 8h22M20 3l5 5-5 5" stroke="#FF6A00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '')
+      + '</div>';
+  }).join('');
+
+  el('impact-list').innerHTML = (FEATURE.impactList || []).map(function(t){
+    return '<div class="row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E45500" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></svg><span class="txt">'+esc(t)+'</span></div>';
+  }).join('');
+}
+
+/* ============================================================
+   Menu lateral — navegação rápida entre módulos
+   ============================================================ */
+function renderSideNav(){
+  var nav = el('sideNav');
+  if (!nav) return;
+
+  if (state.screen === 'home'){
+    nav.classList.add('is-hidden');
+    nav.innerHTML = '';
+    return;
+  }
+
+  nav.classList.remove('is-hidden');
+  var current = state.stageId;
+  if (state.screen === 'feature' || state.screen === 'impact') current = currentFeature().stageId || state.stageId;
+
+  var items = ORDER.map(function(id){
+    var st = STAGES[id];
+    var active = current === id;
+    return '<button class="side-nav__item '+(active?'is-active':'')+'" data-stage="'+id+'" onclick="Atlas.go(\'module\',\''+id+'\')">'
+      + '<span class="side-nav__dot"></span>'
+      + '<span>'+esc(st.label)+'</span>'
+      + '</button>';
+  }).join('');
+
+  nav.innerHTML =
+    '<div class="side-nav__label">Navegação</div>'
+    + '<div class="side-nav__list">'
+    +   '<button class="side-nav__item '+(state.screen === 'map' ? 'is-active' : '')+'" onclick="Atlas.go(\'map\')"><span class="side-nav__dot"></span><span>Início</span></button>'
+    +   '<div class="side-nav__divider"></div>'
+    +   items
+    + '</div>';
+}
+
+
+/* ============================================================
+   EFEITOS VISUAIS — leves e úteis
+   ============================================================ */
+function runEffects(){
+  applyReveal();
+  applyRipple();
+  previewModuleFromSideNav();
+}
+
+function applyReveal(){
+  var nodes = Array.prototype.slice.call(document.querySelectorAll('.screen.is-active .station-chip, .screen.is-active .lens-choice, .screen.is-active .tela, .screen.is-active .panel, .screen.is-active .mini-card, .screen.is-active .conn, .screen.is-active .foot-card, .screen.is-active .impact-box'));
+  nodes.forEach(function(n,i){
+    n.classList.add('fx-reveal');
+    n.style.transitionDelay = Math.min(i * 28, 220) + 'ms';
+    requestAnimationFrame(function(){ n.classList.add('is-visible'); });
+  });
+}
+
+function applyRipple(){
+  var nodes = Array.prototype.slice.call(document.querySelectorAll('button, .station-chip, .tela.is-openable, .lens-choice'));
+  nodes.forEach(function(btn){
+    if (btn.dataset.fxRipple === '1') return;
+    btn.dataset.fxRipple = '1';
+    btn.classList.add('fx-ripple');
+    btn.addEventListener('click', function(ev){
+      var r = btn.getBoundingClientRect();
+      var dot = document.createElement('span');
+      var size = Math.max(r.width, r.height) / 3;
+      dot.className = 'ripple-dot';
+      dot.style.width = size + 'px';
+      dot.style.height = size + 'px';
+      dot.style.left = (ev.clientX - r.left - size/2) + 'px';
+      dot.style.top = (ev.clientY - r.top - size/2) + 'px';
+      btn.appendChild(dot);
+      setTimeout(function(){ dot.remove(); }, 600);
+    });
+  });
+}
+
+function toast(msg){
+  var t = el('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('is-on');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function(){ t.classList.remove('is-on'); }, 1600);
+}
+
+function previewModuleFromSideNav(){
+  var nav = el('sideNav');
+  if (!nav) return;
+  Array.prototype.slice.call(nav.querySelectorAll('[data-stage]')).forEach(function(item){
+    if (item.dataset.previewReady === '1') return;
+    item.dataset.previewReady = '1';
+    item.addEventListener('mouseenter', function(){
+      var id = item.getAttribute('data-stage');
+      Array.prototype.slice.call(document.querySelectorAll('[data-stage-card="'+id+'"]')).forEach(function(card){card.classList.add('is-preview');});
+    });
+    item.addEventListener('mouseleave', function(){
+      Array.prototype.slice.call(document.querySelectorAll('.is-preview')).forEach(function(card){card.classList.remove('is-preview');});
+    });
+  });
+}
+
+/* ============================================================
+   Breadcrumb — "onde estou" em cada tela
+   ============================================================ */
+function renderCrumbs(){
+  var c = el('crumbs'), tagline = el('tagline');
+  var parts = [];
+  var lensMeta = LENSES.filter(function(l){ return l.id === state.lens; })[0];
+
+  if (state.screen === 'home'){
+    c.innerHTML = ''; c.style.display='none'; tagline.style.display='';
+    return;
+  }
+  c.style.display=''; tagline.style.display='none';
+
+  function crumb(label, act, current, color){
+    if (current) return '<span class="current"'+(color?' style="color:'+color+'"':'')+'>'+esc(label)+'</span>';
+    return '<a onclick="'+act+'">'+esc(label)+'</a>';
+  }
+  function sep(){ return '<span class="sep">›</span>'; }
+
+  if (state.screen === 'map'){
+    parts = [crumb('Início', '', true)];
+  } else if (state.screen === 'module'){
+    parts = [crumb('Início', "Atlas.go('map')"), sep(), crumb(STAGES[state.stageId].label, '', true)];
+  } else if (state.screen === 'feature'){
+    var f = currentFeature();
+    var st = STAGES[f.stageId] || STAGES[state.stageId];
+    parts = [crumb('Início', "Atlas.go('map')"), sep(), crumb(st.label, "Atlas.go('module','"+(f.stageId||state.stageId)+"')"), sep(), crumb(f.title, '', true), sep(), crumb(lensMeta.label, '', true, lensMeta.ink)];
+  } else if (state.screen === 'impact'){
+    var fi = currentFeature();
+    var sti = STAGES[fi.stageId] || STAGES[state.stageId];
+    parts = [crumb(sti.label, "Atlas.go('module','"+(fi.stageId||state.stageId)+"')"), sep(), crumb(fi.title, "Atlas.go('feature','"+state.featureId+"')"), sep(), crumb('Mapa de impacto', '', true)];
+  }
+  c.innerHTML = parts.join('');
+}
+
+/* ============================================================
+   Navegação — troca de tela e de lente
+   ============================================================ */
+function showScreen(name){
+  var screens = document.querySelectorAll('.screen');
+  for (var i=0;i<screens.length;i++){
+    screens[i].classList.toggle('is-active', screens[i].getAttribute('data-screen') === name);
+  }
+  el('main').scrollTop = 0;
+}
+
+var Atlas = {
+  // go(tela [, stageId ou lente])
+  go:function(screen, arg){
+    state.screen = screen;
+    if (screen === 'module' && arg){
+      state.stageId = arg;
+      renderModule();
+    }
+    if (screen === 'feature'){
+      if (arg && FEATURE_DATA[arg]){
+        state.featureId = arg;
+        state.stageId = currentFeature().stageId || state.stageId;
+      } else if (arg){
+        state.lens = arg;
+      }
+      renderFeatureStatic();
+      renderLens();
+    }
+    if (screen === 'impact'){
+      renderImpact();
+    }
+    renderCrumbs();
+    renderSideNav();
+    showScreen(screen);
+    requestAnimationFrame(runEffects);
+  },
+  setLens:function(lens){
+    state.lens = lens;
+    renderLens();
+    renderViewSelector();
+    renderCrumbs();
+    var l = LENSES.filter(function(x){ return x.id === lens; })[0];
+    if (l) toast('Lente ativa: ' + l.label);
+    requestAnimationFrame(runEffects);
+  }
+};
+window.Atlas = Atlas;
+
+/* ============================================================
+   Inicialização
+   ============================================================ */
+renderHome();
+renderMap();
+renderFeatureStatic();
+renderLens();
+renderCrumbs();
+renderSideNav();
+requestAnimationFrame(runEffects);
+
+})();
+</script>
+</body>
+</html>
