@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - "vr-atlas-alterações"
+      - "vr-atlas-alteracoes"
   workflow_dispatch:
 
 permissions:
@@ -30,7 +30,7 @@ jobs:
       - name: Baixar versão de testes
         uses: actions/checkout@v6
         with:
-          ref: "vr-atlas-alterações"
+          ref: "vr-atlas-alteracoes"
           path: preview
 
       - name: Montar site oficial e ambiente de testes
