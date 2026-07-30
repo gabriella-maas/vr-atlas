@@ -1,0 +1,69 @@
+name: Deploy VR Atlas
+
+on:
+  push:
+    branches:
+      - main
+      - "vr-atlas-alterações"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar versão oficial
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          path: production
+
+      - name: Baixar versão de testes
+        uses: actions/checkout@v6
+        with:
+          ref: "vr-atlas-alterações"
+          path: preview
+
+      - name: Montar site oficial e ambiente de testes
+        run: |
+          mkdir -p _site/teste
+
+          rsync -av \
+            --exclude='.git' \
+            --exclude='.github' \
+            production/ _site/
+
+          rsync -av \
+            --exclude='.git' \
+            --exclude='.github' \
+            preview/ _site/teste/
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Preparar arquivos para publicação
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
